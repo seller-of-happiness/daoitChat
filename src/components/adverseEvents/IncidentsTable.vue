@@ -17,7 +17,6 @@ import { useApiStore } from '@/refactoring/modules/apiStore/stores/apiStore'
 import { useFeedbackStore } from '@/refactoring/modules/feedback/stores/feedbackStore'
 import { useResponsibilityEntries } from '@/refactoring/modules/responsibilityEntries/stores/responsibilityEntriesStore'
 import { formatResponsibilityDate } from '@/refactoring/utils/formatters'
-/*import { useGlobalConfirm } from '@/refactoring/modules/feedback/utils/useGlobalConfirm'*/
 import type { IAdverseEvent } from '@/refactoring/modules/apiStore/types/adverse-events/IAdverseEvent'
 import type { ICreateAdversePayload } from '@/refactoring/modules/apiStore/types/adverse-events/ICreateAdversePayload'
 import { ERouteNames } from '@/router/ERouteNames'
@@ -29,7 +28,6 @@ const feedbackStore = useFeedbackStore() // Хранилище состояни�
 const responsibilityEntries = useResponsibilityEntries() // Хранилище записей ответственности
 const dt = ref() // Ссылка на компонент DataTable
 const selectedElements = ref<IAdverseEvent[]>([]) // Выбранные элементы в таблице
-/*const confirmAction = useGlobalConfirm() // Утилита подтверждения действий*/
 
 
 /**

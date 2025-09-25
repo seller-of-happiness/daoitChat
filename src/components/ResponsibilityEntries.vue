@@ -282,15 +282,8 @@ function onEmployeeSelected(employee: IEmployee | null) {
 }
 
 /**
- * Обработчик передачи мероприятия
- *
- * 1. Устанавливает режим формы в 'transfer'
- * 2. Показывает форму
+ * Обработчик передачи мероприятия (функционал пока не реализован)
  */
-/*function onTransferClick() {
-    responsibilityEntriesStore.setFormMode('transfer')
-    showForm()
-}*/
 
 /**
  * Наблюдатель за изменением отдела

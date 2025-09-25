@@ -29,7 +29,6 @@ import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 
 // Импорты утилит и хранилищ
-/*import { useGlobalConfirm } from '@/refactoring/modules/feedback/utils/useGlobalConfirm'*/
 import { useSupportService } from '@/refactoring/modules/supportService/stores/supportService'
 import { useFeedbackStore } from '@/refactoring/modules/feedback/stores/feedbackStore'
 import { formatResponsibilityDate } from '@/refactoring/utils/formatters'
@@ -40,7 +39,6 @@ import { ERouteNames } from '@/router/ERouteNames'
 
 // Инициализация роутера и утилит
 const router = useRouter()
-/*const confirmAction = useGlobalConfirm()*/
 
 // Инициализация хранилищ
 const supportServiceStore = useSupportService()
@@ -115,59 +113,6 @@ function statusForFilter(_data: ISupportServiceItem): string {
 function renewData() {
     supportServiceStore.resetFilters()
 }
-/*
-/!**
- * Удаление заявки с подтверждением
- * @param item - Объект заявки для удаления
- *!/
-async function deleteAction(item: ISupportServiceItem) {
-    if (!item || !item.id) return
-
-    try {
-        await confirmAction({
-            message: `Удалить заявку № ${item.id}?`,
-            header: 'Подтверждение действия',
-            icon: 'pi pi-exclamation-triangle',
-            acceptLabel: 'Удалить',
-            rejectLabel: 'Отмена',
-            acceptClass: 'p-button-danger'
-        })
-        await supportServiceStore.deleteSupportService(item.id)
-    } catch {
-        // Пользователь отменил — ничего не делаем
-    }
-}*/
-/*
-/!**
- * Создание кнопок действий для таблицы
- * @param item - Объект заявки для действий
- * @returns Массив объектов-кнопок с обработчиками
- *!/
-function createTableActionButtons(item: ISupportServiceItem) {
-    return [
-        {
-            label: 'Просмотреть',
-            icon: 'pi pi-map',
-            command: () => {
-                router.push({ name: 'view-support-service', params: { id: item.id } })
-            },
-        },
-        {
-            label: 'Редактировать',
-            icon: 'pi pi-pen-to-square',
-            command: () => {
-                router.push({ name: 'edit-support-service', params: { id: item.id } })
-            },
-        },
-        {
-            label: 'Удалить',
-            icon: 'pi pi-trash',
-            command: () => {
-                deleteAction(item)
-            },
-        },
-    ]
-}*/
 /**
  * Обрабатывает изменение страницы в таблице
  * @param event - объект с параметрами пагинации
