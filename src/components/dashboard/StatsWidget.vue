@@ -23,6 +23,7 @@ import { useUserStore } from '@/refactoring/modules/user/stores/userStore'
 import { useTicketsStore } from '@/refactoring/modules/tickets/stores/ticketsStore'
 import { computed, onMounted } from 'vue'
 import { ERouteNames } from '@/router/ERouteNames'
+import { useStatsTrend } from '@/composables/useStatsTrend'
 
 // ======================
 // Инициализация хранилищ
@@ -133,87 +134,35 @@ const prevMonthSupport = computed(() => {
 // Общие вычисляемые свойства
 // ======================
 
-/**
- * Вычисляет разницу между текущим и предыдущим месяцем
- *
- * @param {number} current - Значение за текущий месяц
- * @param {number} prev - Значение за предыдущий месяц
- * @returns {number} Разница между месяцами
- */
-const calculateTrend = (current: number, prev: number) => current - prev
-
-/**
- * Вычисляет процентное изменение между месяцами
- *
- * @param {number} trend - Разница между месяцами
- * @param {number} prev - Значение за предыдущий месяц
- * @returns {number|null} Процент изменения или null, если нельзя вычислить
- */
-const calculatePercentChange = (trend: number, prev: number) => {
-    if (!prev) return null
-    return Math.round((trend / prev) * 100)
-}
-
-/**
- * Формирует текстовую метку для отображения тренда
- *
- * @param {number} trend - Разница между месяцами
- * @param {number} prev - Значение за предыдущий месяц
- * @returns {string} Текстовая метка тренда
- */
-const getTrendLabel = (trend: number, prev: number) => {
-    if (!prev) return trend === 0 ? 'Без изменений' : `${trend}`
-    if (trend > 0) return `+${trend}`
-    if (trend < 0) return `${trend}`
-    return 'Без изменений'
-}
-
-/**
- * Формирует текстовую метку процентного изменения
- *
- * @param {number} trend - Разница между месяцами
- * @param {number|null} percentChange - Процент изменения
- * @returns {string} Текстовая метка процентов
- */
-const getPercentLabel = (trend: number, percentChange: number | null) => {
-    if (percentChange === null || trend === 0) return ''
-    if (trend > 0) return `на ${percentChange}% больше`
-    if (trend < 0) return `на ${Math.abs(percentChange)}% меньше`
-    return ''
-}
-
-/**
- * Определяет класс для стилизации процентного изменения
- *
- * @param {number} trend - Разница между месяцами
- * @param {number|null} percentChange - Процент изменения
- * @param {number} prev - Значение за предыдущий месяц
- * @returns {string} CSS класс для стилизации
- */
-const getPercentClass = (trend: number, percentChange: number | null, prev: number) => {
-    if (!prev || trend === 0 || percentChange === null) return 'text-muted-color'
-    if (trend > 0) return 'text-red-500'
-    if (trend < 0) return 'text-green-500'
-    return 'text-muted-color'
-}
-
 // ======================
+// Использование composable для трендов (DRY принцип)
+// ======================
+
 // Вычисления для Нежелательных Событий
-// ======================
-const trendNS = computed(() => calculateTrend(currentMonthNS.value, prevMonthNS.value))
-const percentChangeNS = computed(() => calculatePercentChange(trendNS.value, prevMonthNS.value))
-const trendLabelNS = computed(() => getTrendLabel(trendNS.value, prevMonthNS.value))
-const percentLabelNS = computed(() => getPercentLabel(trendNS.value, percentChangeNS.value))
-const percentClassNS = computed(() => getPercentClass(trendNS.value, percentChangeNS.value, prevMonthNS.value))
+const nsData = computed(() => ({
+  current: currentMonthNS.value,
+  previous: prevMonthNS.value
+}))
+const {
+  trend: trendNS,
+  percentChange: percentChangeNS,
+  trendLabel: trendLabelNS,
+  percentLabel: percentLabelNS,
+  percentClass: percentClassNS
+} = useStatsTrend(nsData.value)
 
-// ======================
-// Вычисления для вспомогательных служб
-// ======================
-const trendSupport = computed(() => calculateTrend(currentMonthSupport.value, prevMonthSupport.value))
-const percentChangeSupport = computed(() => calculatePercentChange(trendSupport.value, prevMonthSupport.value))
-const trendLabelSupport = computed(() => getTrendLabel(trendSupport.value, prevMonthSupport.value))
-const percentLabelSupport = computed(() => getPercentLabel(trendSupport.value, percentChangeSupport.value))
-const percentClassSupport = computed(() => getPercentClass(trendSupport.value, percentChangeSupport.value, prevMonthSupport.value))
+// Вычисления для вспомогательных служб  
+const supportData = computed(() => ({
+  current: currentMonthSupport.value,
+  previous: prevMonthSupport.value
+}))
+const {
+  trend: trendSupport,
+  percentChange: percentChangeSupport,
+  trendLabel: trendLabelSupport,
+  percentLabel: percentLabelSupport,
+  percentClass: percentClassSupport
+} = useStatsTrend(supportData.value)
 
 // ======================
 // Обработчики событий
