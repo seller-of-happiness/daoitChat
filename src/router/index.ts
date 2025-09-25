@@ -168,7 +168,7 @@ const router = createRouter({
                     path: 'chat/:param?',
                     name: ERouteNames.CHAT,
                     component: () =>
-                        import('@/refactoring/modules/chat/components/ChatInterface.vue'),
+                        import('@/refactoring/modules/chat/components/core/ChatInterface.vue'),
                     props: (route) => ({
                         userId: route.params.param || undefined,
                     }),
