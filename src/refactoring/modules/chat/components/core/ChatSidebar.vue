@@ -183,10 +183,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { generateChatInitials, withBase } from '@/refactoring/modules/chat/utils/chatHelpers'
-import ChatListItem from './ChatListItem.vue'
-import EmployeeListItem from './EmployeeListItem.vue'
-import InvitationListItem from './InvitationListItem.vue'
-import ChatListSkeletonGroup from './ChatListSkeletonGroup.vue'
+import ChatListItem from '../lists/ChatListItem.vue'
+import EmployeeListItem from '../lists/EmployeeListItem.vue'
+import InvitationListItem from '../lists/InvitationListItem.vue'
+import ChatListSkeletonGroup from '../common/skeletons/ChatListSkeletonGroup.vue'
 import type { IChat, IEmployee, ISearchResults, IChatInvitation } from '@/refactoring/modules/chat/types/IChat'
 
 interface Props {

@@ -144,10 +144,10 @@ import 'photoswipe/style.css'
 import ChatSidebar from './ChatSidebar.vue'
 import ChatHeader from './ChatHeader.vue'
 import ChatInput from './ChatInput.vue'
-import MessageItem from './MessageItem.vue'
-import ChatCreateDialog from './ChatCreateDialog.vue'
-import InviteUsersDialog from './InviteUsersDialog.vue'
-import SoundActivationBanner from './SoundActivationBanner.vue'
+import MessageItem from '../messages/MessageItem.vue'
+import ChatCreateDialog from '../dialogs/ChatCreateDialog.vue'
+import InviteUsersDialog from '../dialogs/InviteUsersDialog.vue'
+import SoundActivationBanner from '../features/sound/SoundActivationBanner.vue'
 
 interface Props {
     /** Видимость скользящего чата */

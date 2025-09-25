@@ -1,0 +1,5 @@
+export { default as ChatInterface } from './ChatInterface.vue'
+export { default as ChatHeader } from './ChatHeader.vue'
+export { default as ChatSidebar } from './ChatSidebar.vue'
+export { default as ChatInput } from './ChatInput.vue'
+export { default as SlidingChat } from './SlidingChat.vue'
