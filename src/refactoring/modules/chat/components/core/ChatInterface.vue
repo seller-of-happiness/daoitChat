@@ -2,12 +2,12 @@
     <div class="flex gap-4 h-[calc(100vh-8rem)] flex-wrap md:flex-nowrap relative overflow-hidden">
         <!-- Боковая панель -->
         <ChatSidebar
-            :chats="chatStore.chats"
-            :current-chat-id="chatStore.currentChat?.id || null"
-            :search-results="chatStore.searchResults"
-            :is-searching="chatStore.isSearching"
-            :is-loading-chats="chatStore.isLoadingChats"
-            :invitations="chatStore.invitations"
+            :chats="chat.chats.value"
+            :current-chat-id="chat.currentChat.value?.id || null"
+            :search-results="chat.searchResults.value"
+            :is-searching="chat.isSearching.value"
+            :is-loading-chats="chat.isLoadingChats.value"
+            :invitations="chat.invitations.value"
             :mobile-class="mobileAsideClass"
             @select-chat="openChatFromList"
             @create-chat="showCreate = true"
@@ -22,7 +22,7 @@
         <section class="w-full card p-0 flex flex-col overflow-hidden" :class="mobileChatClass">
             <!-- Заголовок чата -->
             <ChatHeader
-                :current-chat="chatStore.currentChat"
+                :current-chat="chat.currentChat.value"
                 :is-mobile="isMobile"
                 :mobile-view="mobileView"
                 @back-to-list="mobileView = 'list'"
@@ -38,9 +38,9 @@
                 ref="messagesContainer"
                 class="flex-1 overflow-y-auto py-4 px-10 bg-surface-50 dark:bg-surface-900/40 flex flex-col gap-1"
             >
-                <template v-if="chatStore.currentChat">
+                <template v-if="chat.currentChat.value">
                     <!-- Показываем скелетоны во время загрузки -->
-                    <template v-if="chatStore.isLoadingMessages">
+                    <template v-if="chat.isLoadingMessages.value">
                         <MessagesSkeletonGroup :count="6" />
                     </template>
                     
@@ -54,10 +54,10 @@
                                 v-for="message in group.items"
                                 :key="`${message.id}-${message.reaction_updated_at || message.updated_at || message.created_at}`"
                                 :message="message"
-                                :reaction-types="chatStore.reactionTypes"
+                                :reaction-types="chat.reactionTypes.value"
                                 :current-user-id="currentUser.id.value"
                                 :current-user-name="currentUser.nameForChat.value"
-                                :chat-members="chatStore.currentChat?.members"
+                                :chat-members="chat.currentChat.value?.members"
                                 @change-reaction="changeReaction"
                                 @remove-my-reaction="removeMyReaction"
                                 @edit-message="editMessage"
@@ -75,8 +75,8 @@
 
             <!-- Область ввода -->
             <ChatInput
-                :current-chat="chatStore.currentChat"
-                :is-sending="chatStore.isSending"
+                :current-chat="chat.currentChat.value"
+                :is-sending="chat.isSending.value"
                 @send-message="sendMessage"
             />
         </section>
@@ -87,21 +87,21 @@
         <!-- Диалог приглашения пользователей -->
         <InviteUsersDialog
             v-model:visible="showInviteDialog"
-            :chat="chatStore.currentChat"
+            :chat="chat.currentChat.value"
             @invite-users="inviteUsers"
         />
 
         <!-- Диалог управления чатом -->
         <ChatMembersManagement
             v-model:visible="showManageDialog"
-            :chat="chatStore.currentChat"
+            :chat="chat.currentChat.value"
             @chat-updated="onChatUpdated"
         />
 
         <!-- Модальное окно со списком участников -->
         <MembersListModal
             v-model:visible="showMembersDialog"
-            :chat="chatStore.currentChat"
+            :chat="chat.currentChat.value"
             @member-removed="onMemberRemoved"
         />
 
@@ -114,6 +114,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useChatLogic } from '@/refactoring/modules/chat/composables/useChatLogic'
 import { usePhotoSwipe } from '@/refactoring/modules/chat/composables/usePhotoSwipe'
+import { useFeedbackStore } from '@/refactoring/modules/feedback/stores/feedbackStore'
 import 'photoswipe/style.css'
 
 import ChatSidebar from './ChatSidebar.vue'
@@ -141,6 +142,9 @@ const chatLogic = useChatLogic({
     messagesContainerSelector: '#chat-messages',
 })
 
+// Получаем модуль чата напрямую для удобства
+const chat = chatLogic.chat
+
 // Инициализация галереи изображений
 usePhotoSwipe({
     gallery: '#chat-messages',
@@ -155,7 +159,6 @@ const showMembersDialog = ref(false)
 
 // Извлекаем нужные переменные из композабла
 const {
-    chatStore,
     currentUser,
     messagesContainer,
     isMobile,
@@ -246,27 +249,27 @@ const inviteUsers = async (userIds: string[]) => {
 }
 
 // Диагностика WebSocket соединения
-const debugWebSocket = () => {
+const debugWebSocket = async () => {
     console.log('=== ДИАГНОСТИКА WEBSOCKET ===')
     
-    const connectionStatus = chatStore.checkWebSocketConnection()
+    const connectionStatus = await chat.checkConnectionHealth()
     console.log('Состояние соединения:', connectionStatus)
     
     // Показываем в интерфейсе тоже
     const fb = useFeedbackStore()
     
-    if (!connectionStatus.connected) {
+    if (!connectionStatus) {
         fb.showToast({
             type: 'warning',
             title: 'WebSocket не подключен',
-            message: `Статус: ${connectionStatus.connecting ? 'подключается' : 'отключен'}. Попробовать переподключение?`,
+            message: 'Попробовать переподключение?',
             time: 10000,
         })
         
         // Предлагаем переподключиться
         setTimeout(async () => {
             try {
-                await chatStore.reconnectToWebSocket()
+                await chat.forceReconnect()
             } catch (error) {
                 console.error('Ошибка переподключения:', error)
             }
@@ -275,68 +278,56 @@ const debugWebSocket = () => {
         fb.showToast({
             type: 'info',
             title: 'WebSocket диагностика',
-            message: `Подключен к ${connectionStatus.subscriptions.length} каналам. Подписан на пользовательский канал: ${connectionStatus.subscribedToUserChannel ? 'Да' : 'Нет'}`,
+            message: 'Соединение работает корректно',
             time: 5000,
         })
     }
 }
 
 const onChatUpdated = (updatedChat: IChat) => {
-    // Обновляем текущий чат в сторе
-    if (chatStore.currentChat?.id === updatedChat.id) {
-        chatStore.currentChat = updatedChat
-    }
-
-    // Обновляем чат в списке чатов
-    const chatIndex = chatStore.chats.findIndex((chat) => chat.id === updatedChat.id)
-    if (chatIndex !== -1) {
-        chatStore.chats.splice(chatIndex, 1, updatedChat)
-    }
+    // Обновления обрабатываются автоматически через реактивную систему чат модуля
+    // Метод оставлен для обратной совместимости
+    console.log('Чат обновлен:', updatedChat)
 }
 
 const onMemberRemoved = async () => {
-    // Обновляем данные чата после удаления участника
-    if (chatStore.currentChat) {
-        try {
-            const updatedChat = await chatStore.fetchChat(chatStore.currentChat.id)
-            onChatUpdated(updatedChat)
-        } catch (error) {
-        }
-    }
+    // Обновления обрабатываются автоматически через реактивную систему чат модуля
+    // Метод оставлен для обратной совместимости
+    console.log('Участник удален из чата')
 }
 
 // Обработчики для редактирования и удаления сообщений
 const editMessage = async (messageId: number) => {
-    if (!chatStore.currentChat) return
+    if (!chat.currentChat.value) return
     
     try {
         // Находим сообщение для редактирования
-        const message = chatStore.messages.find(m => m.id === messageId)
+        const message = chat.messages.value.find(m => m.id === messageId)
         if (!message) return
         
         // Показываем prompt для редактирования
         const newContent = prompt('Редактировать сообщение:', message.content)
         if (newContent === null || newContent.trim() === '') return
         
-        // Обновляем сообщение через store
-        await chatStore.updateMessage(chatStore.currentChat.id, messageId, newContent.trim())
+        // Обновляем сообщение через chat модуль
+        await chat.updateMessage(chat.currentChat.value.id, messageId, newContent.trim())
     } catch (error) {
-        // Ошибка обрабатывается в store
+        // Ошибка обрабатывается в модуле
     }
 }
 
 const deleteMessage = async (messageId: number) => {
-    if (!chatStore.currentChat) return
+    if (!chat.currentChat.value) return
     
     try {
         // Подтверждение удаления
         const confirmed = confirm('Вы уверены, что хотите удалить это сообщение?')
         if (!confirmed) return
         
-        // Удаляем сообщение через store
-        await chatStore.deleteMessage(chatStore.currentChat.id, messageId)
+        // Удаляем сообщение через chat модуль
+        await chat.deleteMessage(chat.currentChat.value.id, messageId)
     } catch (error) {
-        // Ошибка обрабатывается в store
+        // Ошибка обрабатывается в модуле
     }
 }
 

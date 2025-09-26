@@ -1,5 +1,5 @@
 import { computed, onMounted, onUnmounted, ref, watch, shallowRef } from 'vue'
-import { useChatStore } from '@/refactoring/modules/chat/stores/chatStore'
+import { useChatModule } from '@/refactoring/modules/chat/composables/useChatModule'
 import { useCurrentUser } from '@/refactoring/modules/chat/composables/useCurrentUser'
 import { useFeedbackStore } from '@/refactoring/modules/feedback/stores/feedbackStore'
 import { toApiDate, formatDateOnly } from '@/refactoring/utils/formatters'
@@ -34,8 +34,8 @@ interface MessageGroup {
 }
 
 export function useChatLogic(options: ChatLogicOptions = {}) {
-    const chatStore = useChatStore()
-    const currentUser = useCurrentUser(chatStore.currentChat)
+    const chat = useChatModule()
+    const currentUser = useCurrentUser(chat.currentChat)
 
     // Состояние компонента
     const messagesContainer = shallowRef<HTMLElement | null>(null)
@@ -56,7 +56,7 @@ export function useChatLogic(options: ChatLogicOptions = {}) {
     const todayKey = toApiDate(new Date())
 
     const groupedMessages = computed<MessageGroup[]>(() => {
-        const items = chatStore.messages
+        const items = chat.messages.value
         if (!items?.length) return []
 
         const groups = new Map<string, MessageGroup>()
@@ -96,38 +96,40 @@ export function useChatLogic(options: ChatLogicOptions = {}) {
     }
 
     // Обработчики для чата
-    const openChatFromList = async (chat: IChat) => {
-        await chatStore.openChat(chat)
+    const openChatFromList = async (chatToOpen: IChat) => {
+        await chat.openChat(chatToOpen)
         if (isMobile.value) mobileView.value = 'chat'
-        options.onChatOpen?.(chat)
+        options.onChatOpen?.(chatToOpen)
     }
 
     const performSearch = async (query: string) => {
-        await chatStore.searchChats(query)
+        await chat.searchChats(query)
     }
 
     const clearSearch = () => {
-        chatStore.searchResults = null
+        chat.clearSearch()
     }
 
     const createNewDialog = async (employee: IEmployee) => {
         try {
-            const chat = await chatStore.createDialog(employee.id)
-            await chatStore.openChat(chat)
+            const newChat = await chat.createDialog(employee.id)
+            await chat.openChat(newChat)
             if (isMobile.value) mobileView.value = 'chat'
-            options.onChatOpen?.(chat)
+            options.onChatOpen?.(newChat)
         } catch (error) {
             // Ошибка создания диалога
         }
     }
 
     const sendMessage = async (content: string, files?: File[]) => {
+        if (!chat.currentChat.value) return
+
         if (files && files.length > 0) {
             // Отправляем сообщение с файлами
-            await chatStore.sendMessageWithFiles(content, files)
+            await chat.sendMessageWithFiles(chat.currentChat.value.id, content, files)
         } else {
             // Отправляем обычное текстовое сообщение
-            await chatStore.sendMessage(content)
+            await chat.sendMessage(chat.currentChat.value.id, content)
         }
     }
 
@@ -139,17 +141,17 @@ export function useChatLogic(options: ChatLogicOptions = {}) {
         icon?: File | null
         addMembersImmediately?: boolean
     }) => {
-        let chat: IChat
+        let newChat: IChat
 
         // Используем соответствующий метод в зависимости от типа
         if (payload.type === 'group') {
-            chat = await chatStore.createGroup({
+            newChat = await chat.createGroup({
                 title: payload.title,
                 description: payload.description,
                 icon: payload.icon,
             })
         } else if (payload.type === 'channel') {
-            chat = await chatStore.createChannel({
+            newChat = await chat.createChannel({
                 title: payload.title,
                 description: payload.description,
                 icon: payload.icon,
@@ -158,21 +160,21 @@ export function useChatLogic(options: ChatLogicOptions = {}) {
             throw new Error(`Unsupported chat type: ${payload.type}`)
         }
 
-        await chatStore.openChat(chat)
-        options.onChatOpen?.(chat)
+        await chat.openChat(newChat)
+        options.onChatOpen?.(newChat)
 
         // Возвращаем объект с чатом и флагом для немедленного добавления участников
         return {
-            chat,
+            chat: newChat,
             shouldInviteMembers: payload.addMembersImmediately || false,
         }
     }
 
     const addMembersToChat = async (userIds: string[]) => {
-        if (!chatStore.currentChat) return
+        if (!chat.currentChat.value) return
 
         try {
-            await chatStore.addMembersToChat(chatStore.currentChat.id, userIds)
+            await chat.addMembersToChat(chat.currentChat.value.id, userIds)
         } catch (error) {
             // Ошибка добавления участников
         }
@@ -183,10 +185,10 @@ export function useChatLogic(options: ChatLogicOptions = {}) {
 
     // Управление участниками чата
     const removeMemberFromChat = async (userId: string) => {
-        if (!chatStore.currentChat) return
+        if (!chat.currentChat.value) return
 
         try {
-            await chatStore.removeMemberFromChat(chatStore.currentChat.id, userId)
+            await chat.removeMemberFromChat(chat.currentChat.value.id, userId)
         } catch (error) {
             // Ошибка удаления участника
         }
@@ -194,10 +196,10 @@ export function useChatLogic(options: ChatLogicOptions = {}) {
 
     // Обновление информации о чате
     const updateChatInfo = async (payload: IChatUpdatePayload) => {
-        if (!chatStore.currentChat) return
+        if (!chat.currentChat.value) return
 
         try {
-            const updatedChat = await chatStore.updateChat(chatStore.currentChat.id, payload)
+            const updatedChat = await chat.updateChat(chat.currentChat.value.id, payload)
             return updatedChat
         } catch (error) {
             // Ошибка обновления чата
@@ -212,20 +214,20 @@ export function useChatLogic(options: ChatLogicOptions = {}) {
     ) => {
         // Если пользователь кликает на ту же реакцию - удаляем её
         if (prevReactionId && prevReactionId === reactionId) {
-            await chatStore.clearMyReactions(messageId)
+            await chat.removeReaction(messageId)
             return
         }
 
         // Если у пользователя уже есть реакция - используем эксклюзивную установку
         if (prevReactionId !== null) {
-            await chatStore.setExclusiveReaction(messageId, reactionId)
+            await chat.setExclusiveReaction(messageId, reactionId)
         } else {
-            await chatStore.addReaction(messageId, reactionId)
+            await chat.addReaction(messageId, reactionId)
         }
     }
 
     const removeMyReaction = async (messageId: number, prevReactionId: number | null) => {
-        await chatStore.clearMyReactions(messageId)
+        await chat.removeReaction(messageId)
     }
 
     // Управление приглашениями
@@ -250,7 +252,7 @@ export function useChatLogic(options: ChatLogicOptions = {}) {
             }
 
             console.log('[useChatLogic] Принимаем приглашение с ID:', invitationId)
-            await chatStore.acceptInvitation(invitationId)
+            await chat.acceptInvitation(invitationId)
         } catch (error) {
             console.error('[useChatLogic] Ошибка принятия приглашения:', error)
             // Ошибка уже обработана в store
@@ -278,7 +280,7 @@ export function useChatLogic(options: ChatLogicOptions = {}) {
             }
 
             console.log('[useChatLogic] Отклоняем приглашение с ID:', invitationId)
-            await chatStore.declineInvitation(invitationId)
+            await chat.declineInvitation(invitationId)
         } catch (error) {
             console.error('[useChatLogic] Ошибка отклонения приглашения:', error)
             // Ошибка уже обработана в store
@@ -301,35 +303,35 @@ export function useChatLogic(options: ChatLogicOptions = {}) {
             }
 
             updateIsMobile()
-            mobileView.value = isMobile.value ? (chatStore.currentChat ? 'chat' : 'list') : 'list'
+            mobileView.value = isMobile.value ? (chat.currentChat.value ? 'chat' : 'list') : 'list'
         }
 
         try {
-            console.log('useChatLogic.initialize: вызываем chatStore.initializeOnce()')
+            console.log('useChatLogic.initialize: вызываем chat.initialize()')
             // Загрузка чатов только один раз (предотвращение дублирования запросов)
-            await chatStore.initializeOnce()
-            console.log('useChatLogic.initialize: chatStore.initializeOnce() завершен')
+            await chat.initialize()
+            console.log('useChatLogic.initialize: chat.initialize() завершен')
 
             let chatToOpen: IChat | null = null
 
             // Попытка найти чат для открытия
             try {
                 if (options.userId) {
-                    chatToOpen = await chatStore.createDialog(options.userId)
+                    chatToOpen = await chat.createDialog(options.userId)
                 } else if (options.initialUserId) {
-                    chatToOpen = await chatStore.createDialog(options.initialUserId)
+                    chatToOpen = await chat.createDialog(options.initialUserId)
                 } else if (options.initialChatId) {
                     // Сначала ищем чат по ID в загруженном списке
                     chatToOpen =
-                        chatStore.chats.find((c: IChat) => c.id === options.initialChatId) || null
+                        chat.chats.value.find((c: IChat) => c.id === options.initialChatId) || null
 
                     // Если чат не найден в списке, попробуем открыть напрямую по ID
                     if (!chatToOpen) {
                         try {
-                            await chatStore.openChatById(options.initialChatId)
+                            await chat.openChat(options.initialChatId)
                             // Если успешно открыли, выходим из блока инициализации
                             if (isMobile.value) mobileView.value = 'chat'
-                            options.onChatOpen?.(chatStore.currentChat!)
+                            options.onChatOpen?.(chat.currentChat.value!)
                             return
                         } catch (error) {
                             // Не удалось открыть чат по ID, продолжаем обычную логику
@@ -343,16 +345,16 @@ export function useChatLogic(options: ChatLogicOptions = {}) {
                         if (savedId && !Number.isNaN(savedId)) {
                             // Сначала пытаемся найти чат в уже загруженном списке
                             chatToOpen =
-                                chatStore.chats.find((c: IChat) => c.id === savedId) || null
+                                chat.chats.value.find((c: IChat) => c.id === savedId) || null
 
                             // Если чат не найден в списке, попробуем открыть по ID
                             // (это загрузит актуальную информацию с сервера)
                             if (!chatToOpen) {
                                 try {
-                                    await chatStore.openChatById(savedId)
+                                    await chat.openChat(savedId)
                                     // Если успешно открыли, выходим из блока инициализации
                                     if (isMobile.value) mobileView.value = 'chat'
-                                    options.onChatOpen?.(chatStore.currentChat!)
+                                    options.onChatOpen?.(chat.currentChat.value!)
                                     return
                                 } catch (error) {
                                     // Не удалось открыть сохраненный чат, продолжаем обычную логику
@@ -367,24 +369,24 @@ export function useChatLogic(options: ChatLogicOptions = {}) {
                 // Если нашли чат для открытия - открываем его
                 if (chatToOpen) {
                     try {
-                        await chatStore.openChat(chatToOpen)
+                        await chat.openChat(chatToOpen)
                         if (isMobile.value) mobileView.value = 'chat'
                         options.onChatOpen?.(chatToOpen)
                     } catch (error) {
                         // Не удалось открыть чат
 
                         // Если не удалось открыть выбранный чат, сбрасываем его
-                        chatStore.currentChat = null
+                        chat.reset()
 
                         // Попытаемся открыть первый доступный чат ТОЛЬКО если не был передан конкретный пользователь
                         if (
                             !options.userId &&
                             !options.initialUserId &&
-                            chatStore.chats.length > 0
+                            chat.chats.value.length > 0
                         ) {
                             try {
-                                const firstChat = chatStore.chats[0]
-                                await chatStore.openChat(firstChat)
+                                const firstChat = chat.chats.value[0]
+                                await chat.openChat(firstChat)
                                 if (isMobile.value) mobileView.value = 'chat'
                                 options.onChatOpen?.(firstChat)
                             } catch (fallbackError) {
@@ -395,13 +397,13 @@ export function useChatLogic(options: ChatLogicOptions = {}) {
                 } else if (
                     !options.userId &&
                     !options.initialUserId &&
-                    chatStore.chats.length > 0
+                    chat.chats.value.length > 0
                 ) {
                     // Если нет конкретного чата для открытия, но есть чаты - открываем первый
                     // ТОЛЬКО если не был передан конкретный пользователь
                     try {
-                        const firstChat = chatStore.chats[0]
-                        await chatStore.openChat(firstChat)
+                        const firstChat = chat.chats.value[0]
+                        await chat.openChat(firstChat)
                         if (isMobile.value) mobileView.value = 'chat'
                         options.onChatOpen?.(firstChat)
                     } catch (error) {
@@ -415,7 +417,7 @@ export function useChatLogic(options: ChatLogicOptions = {}) {
                 // НЕ откатываемся к localStorage чату
                 if (options.userId || options.initialUserId) {
                     // Очищаем текущий чат, чтобы показать пустое состояние
-                    chatStore.currentChat = null
+                    chat.reset()
                 }
 
                 // Не прерываем инициализацию из-за ошибок чата
@@ -462,7 +464,7 @@ export function useChatLogic(options: ChatLogicOptions = {}) {
 
     // Наблюдатели с оптимизацией
     watch(
-        () => chatStore.currentChat?.id,
+        () => chat.currentChat.value?.id,
         () => {
             autoScroll.value = true
             requestAnimationFrame(scrollToBottom)
@@ -471,7 +473,7 @@ export function useChatLogic(options: ChatLogicOptions = {}) {
     )
 
     watch(
-        () => chatStore.messages.length,
+        () => chat.messages.value.length,
         () => {
             if (autoScroll.value) {
                 requestAnimationFrame(scrollToBottom)
@@ -481,8 +483,8 @@ export function useChatLogic(options: ChatLogicOptions = {}) {
     )
 
     return {
-        // Хранилище и пользователь
-        chatStore,
+        // Модуль чата (новая архитектура)
+        chat,
         currentUser,
 
         // Состояние
@@ -520,5 +522,8 @@ export function useChatLogic(options: ChatLogicOptions = {}) {
 
         // Утилиты
         updateIsMobile,
+
+        // Обратная совместимость (обертка для доступа к старому API)
+        chatStore: chat,
     }
 }
