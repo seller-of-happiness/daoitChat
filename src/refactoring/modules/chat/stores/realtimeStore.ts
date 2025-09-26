@@ -99,11 +99,12 @@ export const useRealtimeStore = defineStore('realtimeStore', {
                 this.setupWebSocketHandlers()
 
                 // Подписываемся на канал
-                const success = await centrifuge.subscribe(channelName, (data: any) => {
+                await centrifuge.subscribe(channelName, (data: any) => {
                     chatWebSocketService.handleCentrifugoMessage(data)
                 })
 
-                if (success) {
+                // Check if subscription was successful
+                if (centrifuge.subscriptions.has(channelName)) {
                     this.isSubscribedToUserChannel = true
                     this.connectionStatus = 'connected'
                     this.reconnectAttempts = 0
@@ -180,7 +181,7 @@ export const useRealtimeStore = defineStore('realtimeStore', {
 
             try {
                 const centrifuge = useCentrifugeStore()
-                await centrifuge.unsubscribe(this.userChannelName)
+                await centrifuge.disconnect()
                 
                 this.isSubscribedToUserChannel = false
                 this.connectionStatus = 'disconnected'
@@ -278,7 +279,7 @@ export const useRealtimeStore = defineStore('realtimeStore', {
             const centrifuge = useCentrifugeStore()
             
             // Проверяем состояние центрифуго
-            if (!centrifuge.isConnected) {
+            if (!centrifuge.connected) {
                 this.connectionStatus = 'disconnected'
                 this.isSubscribedToUserChannel = false
                 return false

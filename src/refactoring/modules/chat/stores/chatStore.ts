@@ -11,18 +11,49 @@
  */
 
 import { defineStore } from 'pinia'
-import type { IChat } from '@/refactoring/modules/chat/types/IChat'
+import type { IChat, IMessage, IReactionType, IChatInvitation, ISearchResults, IChatUpdatePayload } from '@/refactoring/modules/chat/types/IChat'
+import type { CreateChatPayload, SendMessagePayload, UpdateMessagePayload, AddReactionPayload } from '@/refactoring/modules/chat/types/api'
 import { chatApiService } from '@/refactoring/modules/chat/services/chatApi'
+import { messageApiService } from '@/refactoring/modules/chat/services/messageApi'
 import { useFeedbackStore } from '@/refactoring/modules/feedback/stores/feedbackStore'
 
 export const useChatStore = defineStore('chatStore', {
     state: () => ({
         chats: [] as IChat[],
         currentChat: null as IChat | null,
+        messages: [] as IMessage[],
+        reactionTypes: [] as IReactionType[],
+        invitations: [] as IChatInvitation[],
+        searchResults: null as ISearchResults | null,
         isLoadingChats: false,
+        isLoadingMessages: false,
+        isSending: false,
+        isSearching: false,
         isInitialized: false,
         isInitializing: false,
     }),
+
+    getters: {
+        // Getter for unread count across all chats
+        totalUnreadCount(): number {
+            return this.chats.reduce((total, chat) => total + (chat.unread_count || 0), 0)
+        },
+
+        // Getter for chats by type
+        chatsByType: (state) => (type: string) => {
+            return state.chats.filter(chat => chat.type === type)
+        },
+
+        // Getter for unread chats
+        unreadChats(): IChat[] {
+            return this.chats.filter(chat => (chat.unread_count || 0) > 0)
+        },
+
+        // Getter for active chats (with recent activity)
+        activeChats(): IChat[] {
+            return this.chats.filter(chat => chat.last_message)
+        },
+    },
 
     actions: {
         async initializeOnce(): Promise<void> {
@@ -89,6 +120,403 @@ export const useChatStore = defineStore('chatStore', {
             } catch (error) {
                 throw error
             }
+        },
+
+        // === Chat Management Methods ===
+        async fetchChat(chatId: string): Promise<IChat | null> {
+            try {
+                const result = await chatApiService.fetchChat(chatId)
+                if (result.success && result.data) {
+                    // Update chat in the list if it exists
+                    const chatIndex = this.chats.findIndex(chat => chat.id === result.data!.id)
+                    if (chatIndex !== -1) {
+                        this.chats[chatIndex] = result.data
+                    }
+                    return result.data
+                }
+                return null
+            } catch (error) {
+                console.error('Error fetching chat:', error)
+                return null
+            }
+        },
+
+        async openChat(chat: IChat): Promise<void> {
+            try {
+                this.currentChat = chat
+                this.isLoadingMessages = true
+                this.messages = []
+
+                // Fetch messages for this chat
+                const result = await messageApiService.fetchMessages(chat.id)
+                if (result.success && result.data) {
+                    this.messages = result.data
+                }
+            } catch (error) {
+                console.error('Error opening chat:', error)
+            } finally {
+                this.isLoadingMessages = false
+            }
+        },
+
+        async openChatById(chatId: string): Promise<void> {
+            const chat = this.chats.find(c => c.id === chatId) || await this.fetchChat(chatId)
+            if (chat) {
+                await this.openChat(chat)
+            }
+        },
+
+        async createChat(payload: CreateChatPayload & { type: string }): Promise<IChat> {
+            try {
+                const result = await chatApiService.createChat(payload)
+                if (result.success && result.data) {
+                    const chat = result.data
+                    this.chats.unshift(chat)
+                    return chat
+                } else {
+                    throw new Error(result.error || 'Failed to create chat')
+                }
+            } catch (error) {
+                throw error
+            }
+        },
+
+        async createGroup(payload: CreateChatPayload): Promise<IChat> {
+            return this.createChat({ ...payload, type: 'group' })
+        },
+
+        async createChannel(payload: CreateChatPayload): Promise<IChat> {
+            return this.createChat({ ...payload, type: 'channel' })
+        },
+
+        async updateChat(chatId: string, payload: IChatUpdatePayload): Promise<IChat> {
+            try {
+                const result = await chatApiService.updateChat(chatId, payload)
+                if (result.success && result.data) {
+                    // Update chat in the list
+                    const chatIndex = this.chats.findIndex(chat => chat.id === chatId)
+                    if (chatIndex !== -1) {
+                        this.chats[chatIndex] = result.data
+                    }
+                    // Update current chat if it's the same
+                    if (this.currentChat?.id === chatId) {
+                        this.currentChat = result.data
+                    }
+                    return result.data
+                } else {
+                    throw new Error(result.error || 'Failed to update chat')
+                }
+            } catch (error) {
+                throw error
+            }
+        },
+
+        async deleteChat(chatId: string): Promise<void> {
+            try {
+                const result = await chatApiService.deleteChat(chatId)
+                if (result.success) {
+                    // Remove from chats list
+                    this.chats = this.chats.filter(chat => chat.id !== chatId)
+                    // Clear current chat if it was deleted
+                    if (this.currentChat?.id === chatId) {
+                        this.currentChat = null
+                        this.messages = []
+                    }
+                } else {
+                    throw new Error(result.error || 'Failed to delete chat')
+                }
+            } catch (error) {
+                throw error
+            }
+        },
+
+        // === Message Management Methods ===
+        async sendMessage(content: string): Promise<void> {
+            if (!this.currentChat) return
+
+            this.isSending = true
+            try {
+                const result = await messageApiService.sendMessage(this.currentChat.id, { content })
+                if (result.success && result.data) {
+                    this.messages.push(result.data)
+                    // Update last message in chat
+                    const chatIndex = this.chats.findIndex(chat => chat.id === this.currentChat!.id)
+                    if (chatIndex !== -1) {
+                        this.chats[chatIndex].last_message = result.data
+                    }
+                }
+            } catch (error) {
+                console.error('Error sending message:', error)
+                throw error
+            } finally {
+                this.isSending = false
+            }
+        },
+
+        async sendMessageWithFiles(content: string, files: File[]): Promise<void> {
+            if (!this.currentChat) return
+
+            this.isSending = true
+            try {
+                const result = await messageApiService.sendMessage(this.currentChat.id, { content, files })
+                if (result.success && result.data) {
+                    this.messages.push(result.data)
+                    // Update last message in chat
+                    const chatIndex = this.chats.findIndex(chat => chat.id === this.currentChat!.id)
+                    if (chatIndex !== -1) {
+                        this.chats[chatIndex].last_message = result.data
+                    }
+                }
+            } catch (error) {
+                console.error('Error sending message with files:', error)
+                throw error
+            } finally {
+                this.isSending = false
+            }
+        },
+
+        async updateMessage(chatId: string, messageId: number, content: string): Promise<void> {
+            try {
+                const result = await messageApiService.updateMessage(messageId, { content })
+                if (result.success && result.data) {
+                    // Update message in local state
+                    const messageIndex = this.messages.findIndex(msg => msg.id === messageId)
+                    if (messageIndex !== -1) {
+                        this.messages[messageIndex] = result.data
+                    }
+                }
+            } catch (error) {
+                console.error('Error updating message:', error)
+                throw error
+            }
+        },
+
+        async deleteMessage(chatId: string, messageId: number): Promise<void> {
+            try {
+                const result = await messageApiService.deleteMessage(messageId)
+                if (result.success) {
+                    // Remove message from local state
+                    this.messages = this.messages.filter(msg => msg.id !== messageId)
+                }
+            } catch (error) {
+                console.error('Error deleting message:', error)
+                throw error
+            }
+        },
+
+        // === Search Methods ===
+        async searchChats(query: string): Promise<void> {
+            this.isSearching = true
+            try {
+                const result = await chatApiService.searchChats({ q: query })
+                if (result.success && result.data) {
+                    this.searchResults = result.data
+                } else {
+                    this.searchResults = null
+                }
+            } catch (error) {
+                console.error('Error searching chats:', error)
+                this.searchResults = null
+            } finally {
+                this.isSearching = false
+            }
+        },
+
+        // === Member Management Methods ===
+        async addMembersToChat(chatId: string, userIds: string[]): Promise<void> {
+            try {
+                const result = await chatApiService.addMembers(chatId, { user_ids: userIds })
+                if (result.success) {
+                    // Refresh the chat data
+                    await this.fetchChat(chatId)
+                }
+            } catch (error) {
+                console.error('Error adding members to chat:', error)
+                throw error
+            }
+        },
+
+        async removeMemberFromChat(chatId: string, userId: string): Promise<void> {
+            try {
+                const result = await chatApiService.removeMember(chatId, { user_id: userId })
+                if (result.success) {
+                    // Refresh the chat data
+                    await this.fetchChat(chatId)
+                }
+            } catch (error) {
+                console.error('Error removing member from chat:', error)
+                throw error
+            }
+        },
+
+        // === Reaction Methods ===
+        async addReaction(messageId: number, reactionId: number): Promise<void> {
+            try {
+                await messageApiService.addReaction(messageId, { reaction_type_id: reactionId })
+                // TODO: Update local message reactions
+            } catch (error) {
+                console.error('Error adding reaction:', error)
+                throw error
+            }
+        },
+
+        async clearMyReactions(messageId: number): Promise<void> {
+            try {
+                await messageApiService.clearReactions(messageId)
+                // TODO: Update local message reactions
+            } catch (error) {
+                console.error('Error clearing reactions:', error)
+                throw error
+            }
+        },
+
+        async setExclusiveReaction(messageId: number, reactionId: number): Promise<void> {
+            try {
+                // First clear existing reactions, then add new one
+                await this.clearMyReactions(messageId)
+                await this.addReaction(messageId, reactionId)
+            } catch (error) {
+                console.error('Error setting exclusive reaction:', error)
+                throw error
+            }
+        },
+
+        // === Invitation Methods ===
+        async fetchInvitations(): Promise<void> {
+            try {
+                const result = await chatApiService.fetchInvitations()
+                if (result.success && result.data) {
+                    this.invitations = result.data
+                }
+            } catch (error) {
+                console.error('Error fetching invitations:', error)
+            }
+        },
+
+        async acceptInvitation(invitationId: string): Promise<void> {
+            try {
+                const result = await chatApiService.acceptInvitation(invitationId)
+                if (result.success) {
+                    // Remove invitation from list
+                    this.invitations = this.invitations.filter(inv => inv.id !== invitationId)
+                    // Refresh chats to include the new chat
+                    await this.fetchChats()
+                }
+            } catch (error) {
+                console.error('Error accepting invitation:', error)
+                throw error
+            }
+        },
+
+        async declineInvitation(invitationId: string): Promise<void> {
+            try {
+                const result = await chatApiService.declineInvitation(invitationId)
+                if (result.success) {
+                    // Remove invitation from list
+                    this.invitations = this.invitations.filter(inv => inv.id !== invitationId)
+                }
+            } catch (error) {
+                console.error('Error declining invitation:', error)
+                throw error
+            }
+        },
+
+        async removeInvitation(invitationId: string): Promise<void> {
+            try {
+                const result = await chatApiService.removeInvitation(invitationId)
+                if (result.success) {
+                    // Remove invitation from list
+                    this.invitations = this.invitations.filter(inv => inv.id !== invitationId)
+                }
+            } catch (error) {
+                console.error('Error removing invitation:', error)
+                throw error
+            }
+        },
+
+        // === Direct Chat Methods ===
+        async findOrCreateDirectChat(userId: string): Promise<IChat> {
+            // First try to find existing direct chat
+            const existingChat = this.chats.find(chat => 
+                chat.type === 'dialog' && 
+                chat.members?.some(member => member.user.id === userId)
+            )
+            
+            if (existingChat) {
+                return existingChat
+            }
+
+            // Create new direct chat
+            return this.createDialog(userId)
+        },
+
+        async createDirectChat(employeeId: string): Promise<IChat> {
+            return this.createDialog(employeeId)
+        },
+
+        // === Utility Methods ===
+        async markChatAsRead(chatId: string, lastMessageId?: number): Promise<void> {
+            try {
+                const result = await chatApiService.markAsRead(chatId, lastMessageId)
+                if (result.success) {
+                    // Update unread count in local state
+                    const chatIndex = this.chats.findIndex(chat => chat.id === chatId)
+                    if (chatIndex !== -1) {
+                        this.chats[chatIndex].unread_count = 0
+                    }
+                }
+            } catch (error) {
+                console.error('Error marking chat as read:', error)
+            }
+        },
+
+        // === WebSocket Methods ===
+        checkWebSocketConnection(): boolean {
+            // TODO: Implement WebSocket connection check
+            return true
+        },
+
+        async reconnectToWebSocket(): Promise<void> {
+            // TODO: Implement WebSocket reconnection
+        },
+
+        // === Lifecycle Methods ===
+        resetInitialization(): void {
+            this.isInitialized = false
+            this.isInitializing = false
+        },
+
+        // === Real-time Event Handlers ===
+        handleNewMessage(message: IMessage, chatId: string): void {
+            // Add message to current chat if it matches
+            if (this.currentChat?.id === chatId) {
+                this.messages.push(message)
+            }
+
+            // Update last message in chat list
+            const chatIndex = this.chats.findIndex(chat => chat.id === chatId)
+            if (chatIndex !== -1) {
+                this.chats[chatIndex].last_message = message
+                // Increment unread count if not current chat
+                if (this.currentChat?.id !== chatId) {
+                    this.chats[chatIndex].unread_count = (this.chats[chatIndex].unread_count || 0) + 1
+                }
+            }
+        },
+
+        handleChatUpdated(chat: IChat): void {
+            const chatIndex = this.chats.findIndex(c => c.id === chat.id)
+            if (chatIndex !== -1) {
+                this.chats[chatIndex] = chat
+            }
+            if (this.currentChat?.id === chat.id) {
+                this.currentChat = chat
+            }
+        },
+
+        handleMembershipUpdate(data: any): void {
+            // Refresh chats when membership changes
+            this.fetchChats()
         },
     },
 })
