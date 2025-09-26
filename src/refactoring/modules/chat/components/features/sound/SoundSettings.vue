@@ -200,12 +200,12 @@ const onForceActivate = async () => {
 </script>
 
 <style lang="scss">
-@use '../styles' as *;
+@use '../../../styles' as *;
 </style>
 
 <style lang="scss" scoped>
-@use '../styles/mixins' as *;
-@use '../styles/variables' as *;
+@use '../../../styles/mixins' as *;
+@use '../../../styles/variables' as *;
 .sound-settings {
     max-width: 400px;
 

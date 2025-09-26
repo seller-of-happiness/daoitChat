@@ -1,126 +1,126 @@
 <template>
     <!-- Overlay для всей страницы -->
     <!-- <Transition name="overlay"> -->
-        <div
-            v-if="isVisible"
-            class="fixed inset-0 bg-surface-950 bg-opacity-50 backdrop-blur-sm z-[9990]"
-            @click="closeChat"
-        />
+    <div
+        v-if="isVisible"
+        class="fixed inset-0 bg-surface-950 bg-opacity-50 backdrop-blur-sm z-[9990]"
+        @click="closeChat"
+    />
     <!-- </Transition> -->
 
     <!-- Основной контейнер скользящего чата -->
     <!-- <Transition name="slide-right"> -->
-        <div
-            v-if="isVisible"
-            data-sliding-chat="true"
-            class="fixed right-0 top-0 h-full bg-white dark:bg-surface-900 shadow-xl shadow-surface-900 z-[9991] w-full max-w-[94vw] pb-10"
-        >
-            <div class="slide-btn w-full flex justify-end pt-8 px-8">
-                <!-- Кнопка переключения в полный режим -->
-                <Button
-                    v-if="!isMobile"
-                    icon="pi pi-external-link"
-                    severity="secondary"
-                    text
-                    rounded
-                    size="medium"
-                    v-tooltip.bottom="'Открыть в полном режиме'"
-                    @click="openFullChat"
-                />
+    <div
+        v-if="isVisible"
+        data-sliding-chat="true"
+        class="fixed right-0 top-0 h-full bg-white dark:bg-surface-900 shadow-xl shadow-surface-900 z-[9991] w-full max-w-[94vw] pb-10"
+    >
+        <div class="slide-btn w-full flex justify-end pt-8 px-8">
+            <!-- Кнопка переключения в полный режим -->
+            <Button
+                v-if="!isMobile"
+                icon="pi pi-external-link"
+                severity="secondary"
+                text
+                rounded
+                size="medium"
+                v-tooltip.bottom="'Открыть в полном режиме'"
+                @click="openFullChat"
+            />
 
-                <!-- Кнопка закрытия -->
-                <Button
-                    icon="pi pi-times"
-                    severity="secondary"
-                    text
-                    rounded
-                    size="medium"
-                    v-tooltip.bottom="'Закрыть'"
-                    @click="closeChat"
-                />
-            </div>
-            <div class="flex gap-4 h-full flex-wrap md:flex-nowrap relative overflow-hidden">
-                <!-- Боковая панель -->
-                <ChatSidebar
-                    :chats="chatStore.chats"
-                    :current-chat-id="chatStore.currentChat?.id || null"
-                    :search-results="chatStore.searchResults"
-                    :is-searching="chatStore.isSearching"
-                    :invitations="chatStore.invitations"
-                    :mobile-class="mobileAsideClass"
-                    @select-chat="openChatFromList"
-                    @create-chat="showCreate = true"
-                    @create-dialog="createNewDialog"
-                    @search="performSearch"
-                    @clear-search="clearSearch"
-                    @accept-invitation="acceptInvitation"
-                    @decline-invitation="declineInvitation"
-                    class="!pt-0"
-                />
-
-                <!-- Основная область чата -->
-                <section
-                    class="w-full card !pt-0 flex flex-col overflow-hidden"
-                    :class="mobileChatClass"
-                >
-                    <!-- Заголовок чата -->
-                    <ChatHeader
-                        :current-chat="chatStore.currentChat"
-                        :is-mobile="isMobile"
-                        :mobile-view="mobileView"
-                        @back-to-list="mobileView = 'list'"
-                        @invite-users="showInviteDialog = true"
-                    >
-                    </ChatHeader>
-
-                    <!-- Область сообщений -->
-                    <div
-                        id="sliding-chat-messages"
-                        ref="messagesContainer"
-                        class="flex-1 overflow-y-auto py-4 px-10 bg-surface-50 dark:bg-surface-900/40 flex flex-col gap-1"
-                    >
-                        <template v-if="chatStore.currentChat">
-                            <template v-for="group in groupedMessages" :key="group.key">
-                                <div class="text-center text-sm text-surface-500 my-2 select-none">
-                                    {{ group.label }}
-                                </div>
-                                <MessageItem
-                                    v-for="message in group.items"
-                                    :key="message.id"
-                                    :message="message"
-                                    :reaction-types="chatStore.reactionTypes"
-                                    :current-user-id="currentUser.id.value"
-                                    :current-user-name="currentUser.nameForChat.value"
-                                    :chat-members="chatStore.currentChat?.members"
-                                    @change-reaction="changeReaction"
-                                    @remove-my-reaction="removeMyReaction"
-                                    @edit-message="editMessage"
-                                    @delete-message="deleteMessage"
-                                />
-                            </template>
-                        </template>
-                        <template v-else>
-                            <div class="h-full flex items-center justify-center text-surface-500">
-                                Выберите чат слева
-                            </div>
-                        </template>
-                    </div>
-
-                    <!-- Область ввода -->
-                    <ChatInput
-                        :current-chat="chatStore.currentChat"
-                        :is-sending="chatStore.isSending"
-                        @send-message="sendMessage"
-                        @upload-file="handleUploadFile"
-                    />
-                </section>
-
-                <!-- Баннер активации звука (как в Битрикс24/Telegram) -->
-
-                <!-- Баннер активации звука (как в Битрикс24/Telegram) -->
-                <SoundActivationBanner />
-            </div>
+            <!-- Кнопка закрытия -->
+            <Button
+                icon="pi pi-times"
+                severity="secondary"
+                text
+                rounded
+                size="medium"
+                v-tooltip.bottom="'Закрыть'"
+                @click="closeChat"
+            />
         </div>
+        <div class="flex gap-4 h-full flex-wrap md:flex-nowrap relative overflow-hidden">
+            <!-- Боковая панель -->
+            <ChatSidebar
+                :chats="chatStore.chats"
+                :current-chat-id="chatStore.currentChat?.id || null"
+                :search-results="chatStore.searchResults"
+                :is-searching="chatStore.isSearching"
+                :invitations="chatStore.invitations"
+                :mobile-class="mobileAsideClass"
+                @select-chat="openChatFromList"
+                @create-chat="showCreate = true"
+                @create-dialog="createNewDialog"
+                @search="performSearch"
+                @clear-search="clearSearch"
+                @accept-invitation="acceptInvitation"
+                @decline-invitation="declineInvitation"
+                class="!pt-0"
+            />
+
+            <!-- Основная область чата -->
+            <section
+                class="w-full card !pt-0 flex flex-col overflow-hidden"
+                :class="mobileChatClass"
+            >
+                <!-- Заголовок чата -->
+                <ChatHeader
+                    :current-chat="chatStore.currentChat"
+                    :is-mobile="isMobile"
+                    :mobile-view="mobileView"
+                    @back-to-list="mobileView = 'list'"
+                    @invite-users="showInviteDialog = true"
+                >
+                </ChatHeader>
+
+                <!-- Область сообщений -->
+                <div
+                    id="sliding-chat-messages"
+                    ref="messagesContainer"
+                    class="flex-1 overflow-y-auto py-4 px-10 bg-surface-50 dark:bg-surface-900/40 flex flex-col gap-1"
+                >
+                    <template v-if="chatStore.currentChat">
+                        <template v-for="group in groupedMessages" :key="group.key">
+                            <div class="text-center text-sm text-surface-500 my-2 select-none">
+                                {{ group.label }}
+                            </div>
+                            <MessageItem
+                                v-for="message in group.items"
+                                :key="message.id"
+                                :message="message"
+                                :reaction-types="chatStore.reactionTypes"
+                                :current-user-id="currentUser.id.value"
+                                :current-user-name="currentUser.nameForChat.value"
+                                :chat-members="chatStore.currentChat?.members"
+                                @change-reaction="changeReaction"
+                                @remove-my-reaction="removeMyReaction"
+                                @edit-message="editMessage"
+                                @delete-message="deleteMessage"
+                            />
+                        </template>
+                    </template>
+                    <template v-else>
+                        <div class="h-full flex items-center justify-center text-surface-500">
+                            Выберите чат слева
+                        </div>
+                    </template>
+                </div>
+
+                <!-- Область ввода -->
+                <ChatInput
+                    :current-chat="chatStore.currentChat"
+                    :is-sending="chatStore.isSending"
+                    @send-message="sendMessage"
+                    @upload-file="handleUploadFile"
+                />
+            </section>
+
+            <!-- Баннер активации звука (как в Битрикс24/Telegram) -->
+
+            <!-- Баннер активации звука (как в Битрикс24/Telegram) -->
+            <SoundActivationBanner />
+        </div>
+    </div>
     <!-- </Transition> -->
 
     <!-- Модальные окна для скользящего чата -->
@@ -273,16 +273,16 @@ const inviteUsers = async (userIds: string[]) => {
 // Обработчики для редактирования и удаления сообщений
 const editMessage = async (messageId: number) => {
     if (!chatStore.currentChat) return
-    
+
     try {
         // Находим сообщение для редактирования
-        const message = chatStore.messages.find(m => m.id === messageId)
+        const message = chatStore.messages.find((m) => m.id === messageId)
         if (!message) return
-        
+
         // Показываем prompt для редактирования
         const newContent = prompt('Редактировать сообщение:', message.content)
         if (newContent === null || newContent.trim() === '') return
-        
+
         // Обновляем сообщение через store
         await chatStore.updateMessage(chatStore.currentChat.id, messageId, newContent.trim())
     } catch (error) {
@@ -292,12 +292,12 @@ const editMessage = async (messageId: number) => {
 
 const deleteMessage = async (messageId: number) => {
     if (!chatStore.currentChat) return
-    
+
     try {
         // Подтверждение удаления
         const confirmed = confirm('Вы уверены, что хотите удалить это сообщение?')
         if (!confirmed) return
-        
+
         // Удаляем сообщение через store
         await chatStore.deleteMessage(chatStore.currentChat.id, messageId)
     } catch (error) {
@@ -327,7 +327,7 @@ onMounted(async () => {
     console.log('SlidingChat.vue: Props при монтировании:', {
         visible: props.visible,
         initialChatId: props.initialChatId,
-        initialUserId: props.initialUserId
+        initialUserId: props.initialUserId,
     })
     try {
         await initialize()
@@ -356,9 +356,19 @@ watch(
     [() => props.initialChatId, () => props.initialUserId, () => props.visible],
     async ([newChatId, newUserId, visible]) => {
         console.log('SlidingChat.vue: Watch triggered', { newChatId, newUserId, visible })
-        console.log('SlidingChat.vue: Условие (visible && (newChatId || newUserId)):', visible && (newChatId || newUserId))
-        console.log('SlidingChat.vue: visible:', visible, 'newChatId:', newChatId, 'newUserId:', newUserId)
-        
+        console.log(
+            'SlidingChat.vue: Условие (visible && (newChatId || newUserId)):',
+            visible && (newChatId || newUserId),
+        )
+        console.log(
+            'SlidingChat.vue: visible:',
+            visible,
+            'newChatId:',
+            newChatId,
+            'newUserId:',
+            newUserId,
+        )
+
         if (visible && (newChatId || newUserId)) {
             try {
                 let chatToOpen: any = null
@@ -392,7 +402,14 @@ watch(
             }
         } else {
             console.log('SlidingChat.vue: Условие не выполнено, чат не открывается')
-            console.log('SlidingChat.vue: visible:', visible, 'newChatId:', newChatId, 'newUserId:', newUserId)
+            console.log(
+                'SlidingChat.vue: visible:',
+                visible,
+                'newChatId:',
+                newChatId,
+                'newUserId:',
+                newUserId,
+            )
         }
     },
     { immediate: true },
@@ -406,14 +423,14 @@ watch(
         console.log('SlidingChat.vue: Текущие props:', {
             visible: props.visible,
             initialChatId: props.initialChatId,
-            initialUserId: props.initialUserId
+            initialUserId: props.initialUserId,
         })
-    }
+    },
 )
 </script>
 
 <style lang="scss">
-@use '../styles' as *;
+@use '../../styles' as *;
 
 // Специфичные стили компонента, которые не покрыты глобальными стилями
 .slide-btn {

@@ -93,9 +93,9 @@ const activateSound = async () => {
                 document.body.removeChild(toast)
             }, 3000)
         }
-        } catch (error) {
-            // Ошибка активации звука
-        } finally {
+    } catch (error) {
+        // Ошибка активации звука
+    } finally {
         isActivating.value = false
     }
 }
@@ -126,12 +126,12 @@ onMounted(() => {
 </script>
 
 <style lang="scss">
-@use '../styles' as *;
+@use '../../../styles/' as *;
 </style>
 
 <style lang="scss" scoped>
-@use '../styles/mixins' as *;
-@use '../styles/variables' as *;
+@use '../../../styles/mixins' as *;
+@use '../../../styles/variables' as *;
 .sound-activation-banner {
     position: fixed;
     top: 0;

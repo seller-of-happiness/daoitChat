@@ -83,7 +83,11 @@
 
             <!-- Контекстное меню для своих сообщений -->
             <transition name="context-menu-pop">
-                <div v-if="showContextMenu" class="context-menu-anchor" :style="contextMenuAnchorStyle">
+                <div
+                    v-if="showContextMenu"
+                    class="context-menu-anchor"
+                    :style="contextMenuAnchorStyle"
+                >
                     <div
                         ref="contextMenuRef"
                         class="context-menu"
@@ -93,11 +97,7 @@
                         @mouseleave="onContextMenuLeave"
                         aria-live="polite"
                     >
-                        <button
-                            class="context-menu-item"
-                            @click.stop="onEditMessage"
-                            type="button"
-                        >
+                        <button class="context-menu-item" @click.stop="onEditMessage" type="button">
                             <i class="pi pi-pencil" />
                             <span>Редактировать</span>
                         </button>
@@ -121,13 +121,13 @@
             >
                 <div class="attachments-container max-w-md">
                     <!-- Изображения в сетке -->
-                    <div 
-                        v-if="imageAttachments.length > 0" 
+                    <div
+                        v-if="imageAttachments.length > 0"
                         class="images-grid mb-2"
                         :class="getImageGridClass(imageAttachments.length)"
                     >
-                        <div 
-                            v-for="(attachment, index) in imageAttachments" 
+                        <div
+                            v-for="(attachment, index) in imageAttachments"
                             :key="`img-${attachment.id}`"
                             class="image-item"
                         >
@@ -171,13 +171,13 @@
         <!-- Сообщение только с вложениями (без текста) -->
         <div v-if="isAttachmentOnly" class="attachments-only">
             <!-- Изображения в сетке -->
-            <div 
-                v-if="imageAttachments.length > 0" 
+            <div
+                v-if="imageAttachments.length > 0"
                 class="images-grid-standalone mb-6"
                 :class="getImageGridClass(imageAttachments.length)"
             >
-                <div 
-                    v-for="(attachment, index) in imageAttachments" 
+                <div
+                    v-for="(attachment, index) in imageAttachments"
                     :key="`img-${attachment.id}`"
                     class="image-item-standalone"
                 >
@@ -188,13 +188,15 @@
                         class="img-wrap block relative"
                         :data-pswp-src="withBase(attachment.file)"
                     >
-                        <img 
-                            :src="withBase(attachment.file)" 
-                            alt="attachment" 
+                        <img
+                            :src="withBase(attachment.file)"
+                            alt="attachment"
                             class="w-full h-full object-cover rounded-lg"
-                            @load="onImageLoadSetDims" 
+                            @load="onImageLoadSetDims"
                         />
-                        <span class="time-badge absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                        <span
+                            class="time-badge absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded"
+                        >
                             {{ shortTime }}
                         </span>
                     </a>
@@ -203,7 +205,11 @@
 
             <!-- Файлы: оборачиваем в пузыри -->
             <div v-if="fileAttachments.length > 0" class="files-standalone space-y-3">
-                <div v-for="attachment in fileAttachments" :key="`file-${attachment.id}`" class="message-bubble">
+                <div
+                    v-for="attachment in fileAttachments"
+                    :key="`file-${attachment.id}`"
+                    class="message-bubble"
+                >
                     <div class="message-content py-4 px-4 flex justify-between items-end">
                         <div class="content-left">
                             <FileAttachmentCard
@@ -283,7 +289,12 @@ import {
     isThumbReaction,
 } from '@/refactoring/modules/chat/composables/useReactions'
 import { setImageDimensions } from '@/refactoring/modules/chat/composables/usePhotoSwipe'
-import type { IMessage, IReactionType, IUser, IChatMember } from '@/refactoring/modules/chat/types/IChat'
+import type {
+    IMessage,
+    IReactionType,
+    IUser,
+    IChatMember,
+} from '@/refactoring/modules/chat/types/IChat'
 
 const props = defineProps<{
     message: IMessage
@@ -375,11 +386,11 @@ const shortTime = computed(() => {
 
 // Разделяем вложения на изображения и файлы
 const imageAttachments = computed(() => {
-    return props.message.attachments?.filter(a => isImage(a.file)) || []
+    return props.message.attachments?.filter((a) => isImage(a.file)) || []
 })
 
 const fileAttachments = computed(() => {
-    return props.message.attachments?.filter(a => !isImage(a.file)) || []
+    return props.message.attachments?.filter((a) => !isImage(a.file)) || []
 })
 
 // Функция для определения CSS класса сетки изображений
@@ -552,7 +563,13 @@ function onMessageLeave() {
     isHoverMessage.value = false
     // Добавляем небольшую задержку перед скрытием триггеров, чтобы пользователь мог навести курсор на кнопки
     setTimeout(() => {
-        if (!isHoverMessage.value && !isHoverTrigger.value && !isHoverPicker.value && !isHoverContextMenuTrigger.value && !isHoverContextMenu.value) {
+        if (
+            !isHoverMessage.value &&
+            !isHoverTrigger.value &&
+            !isHoverPicker.value &&
+            !isHoverContextMenuTrigger.value &&
+            !isHoverContextMenu.value
+        ) {
             showTrigger.value = false
         }
     }, 150)
@@ -579,7 +596,7 @@ function onTriggerClick() {
 function openContextMenu() {
     const el = contextMenuTriggerRef.value
     if (!el) return
-    
+
     const rect = el.getBoundingClientRect()
     // Позиционируем меню прямо над кнопкой с тремя точками
     contextMenuAnchorStyle.value = {
@@ -690,5 +707,5 @@ function onDeleteMessage() {
 </script>
 
 <style scoped lang="scss">
-@use '../styles/MessageItem.scss' as *;
+@use '../../styles/MessageItem.scss' as *;
 </style>

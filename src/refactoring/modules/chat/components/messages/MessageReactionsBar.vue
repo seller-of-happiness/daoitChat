@@ -41,12 +41,12 @@ const withBase = (path: string | null | undefined) => {
 
 function getInitials(name: string): string {
     const trimmed = String(name || '').trim()
-    
+
     // Если имя пустое или является резервным значением, возвращаем знак вопроса
     if (!trimmed || trimmed === 'Unknown User') return '??'
-    
+
     const parts = trimmed.split(/\s+/)
-    
+
     // Если это резервный формат "User 123" или "User Unknown"
     if (parts.length === 2 && parts[0] === 'User') {
         const userId = parts[1]
@@ -61,7 +61,7 @@ function getInitials(name: string): string {
         // Иначе используем первые 2 символа
         return userId.slice(0, 2).toUpperCase()
     }
-    
+
     if (parts.length === 1) {
         const word = parts[0]
         // Если это короткое имя или инициал
@@ -71,29 +71,32 @@ function getInitials(name: string): string {
         // Для длинных слов берем первые 2 символа
         return word.slice(0, 2).toUpperCase()
     }
-    
+
     // Для имен пользователей берем инициалы в правильном порядке: Имя + Фамилия
     const firstName = parts[0]
     const lastName = parts[1]
-    
+
     // Проверяем, является ли это именем пользователя (не техническими данными)
-    const isLikelyNameSurname = firstName.length <= 15 && lastName.length <= 20 && 
-                               !/^\d+$/.test(firstName) && !/^\d+$/.test(lastName)
-    
+    const isLikelyNameSurname =
+        firstName.length <= 15 &&
+        lastName.length <= 20 &&
+        !/^\d+$/.test(firstName) &&
+        !/^\d+$/.test(lastName)
+
     if (isLikelyNameSurname) {
         return (firstName[0] + lastName[0]).toUpperCase()
     }
-    
+
     // Для остальных случаев берем первые символы первых двух частей
     return (parts[0][0] + (parts[1] ? parts[1][0] : '·')).toUpperCase()
 }
 </script>
 
 <style lang="scss">
-@use '../styles' as *;
+@use '../../styles' as *;
 </style>
 
 <style lang="scss" scoped>
-@use '../styles/mixins' as *;
-@use '../styles/variables' as *;
+@use '../../styles/mixins' as *;
+@use '../../styles/variables' as *;
 </style>

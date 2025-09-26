@@ -16,7 +16,7 @@
 </script>
 
 <style scoped lang="scss">
-@use '../styles/skeletons' as *;
+@use '../../../styles/skeletons' as *;
 
 .chat-item-skeleton {
     display: flex;

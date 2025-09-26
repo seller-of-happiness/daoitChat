@@ -1,5 +1,5 @@
 <template>
-    <div 
+    <div
         :class="['message-skeleton', 'mb-6', `message-skeleton--${type}`]"
         :data-dir="type === 'mine' ? 'out' : 'in'"
     >
@@ -13,7 +13,10 @@
                                 class="skeleton-line skeleton-line--medium"
                                 v-if="linesCount > 1"
                             ></div>
-                            <div class="skeleton-line skeleton-line--short" v-if="linesCount > 2"></div>
+                            <div
+                                class="skeleton-line skeleton-line--short"
+                                v-if="linesCount > 2"
+                            ></div>
                         </div>
                     </div>
                     <div class="skeleton-time"></div>
@@ -40,7 +43,7 @@ const props = withDefaults(defineProps<Props>(), {
 </script>
 
 <style scoped lang="scss">
-@use '../styles/skeletons' as *;
+@use '../../../styles/skeletons' as *;
 
 .message-skeleton {
     display: flex;
@@ -55,30 +58,30 @@ const props = withDefaults(defineProps<Props>(), {
         align-self: flex-end;
         margin-left: auto;
         flex-direction: row-reverse;
-    
+
         .message-skeleton-bubble {
             background: rgba(5, 150, 105, 0.3) !important;
             border-radius: 16px 4px 16px 16px !important;
             box-shadow: 0 2px 8px rgba(5, 150, 105, 0.2);
         }
-        
+
         .skeleton-line,
         .skeleton-time {
             background: rgba(255, 255, 255, 0.4) !important;
         }
     }
-  
+
     &--theirs {
         align-self: flex-start;
         margin-right: auto;
-    
+
         .message-skeleton-bubble {
             background: #f1f5f9 !important;
             border-radius: 4px 16px 16px 16px !important;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
             border: 1px solid rgba(0, 0, 0, 0.06);
         }
-        
+
         .skeleton-line,
         .skeleton-time {
             background: rgba(0, 0, 0, 0.1) !important;
@@ -123,15 +126,15 @@ const props = withDefaults(defineProps<Props>(), {
 .skeleton-line {
     @extend .skeleton-text;
     border-radius: 0.25rem;
-    
+
     &--short {
         width: 40%;
     }
-    
+
     &--medium {
         width: 65%;
     }
-    
+
     &--long {
         width: 85%;
     }

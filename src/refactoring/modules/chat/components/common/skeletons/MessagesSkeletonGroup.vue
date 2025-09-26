@@ -47,7 +47,7 @@ const skeletons = computed<SkeletonMessage[]>(() => {
 </script>
 
 <style scoped lang="scss">
-@use '../styles/skeletons' as *;
+@use '../../../styles/skeletons' as *;
 
 .messages-skeleton-group {
     /* Стили группы скелетонов сообщений */
