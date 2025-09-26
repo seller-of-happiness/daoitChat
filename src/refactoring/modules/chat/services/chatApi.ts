@@ -85,7 +85,7 @@ export class ChatApiService {
 
             return {
                 success: true,
-                data: chat,
+                data: chat as IChat,
             }
         } catch (error) {
             return {
@@ -117,7 +117,7 @@ export class ChatApiService {
 
             return {
                 success: true,
-                data: chat,
+                data: chat as IChat,
             }
         } catch (error) {
             return {
@@ -149,7 +149,7 @@ export class ChatApiService {
 
             return {
                 success: true,
-                data: chat,
+                data: chat as IChat,
             }
         } catch (error) {
             return {
@@ -172,7 +172,7 @@ export class ChatApiService {
 
             return {
                 success: true,
-                data: chat,
+                data: chat as IChat,
             }
         } catch (error) {
             return {
@@ -212,7 +212,7 @@ export class ChatApiService {
 
             return {
                 success: true,
-                data: updatedChat,
+                data: updatedChat as IChat,
             }
         } catch (error) {
             return {
@@ -328,7 +328,7 @@ export class ChatApiService {
 
             return {
                 success: true,
-                data: unreadData,
+                data: unreadData as UnreadCountsResponse,
             }
         } catch (error) {
             // API может возвращать 404 если не реализован - возвращаем пустой объект

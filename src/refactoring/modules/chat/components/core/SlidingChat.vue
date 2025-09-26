@@ -91,7 +91,7 @@
                                 :reaction-types="chatStore.reactionTypes"
                                 :current-user-id="currentUser.id.value"
                                 :current-user-name="currentUser.nameForChat.value"
-                                :chat-members="chatStore.currentChat?.members"
+                                :chat-members="transformedChatMembers"
                                 @change-reaction="changeReaction"
                                 @remove-my-reaction="removeMyReaction"
                                 @edit-message="editMessage"
@@ -214,6 +214,17 @@ const {
 const handleUploadFile = (file: File) => {
     console.warn('Upload file functionality not implemented yet', file)
 }
+
+// Transform chat members to the format expected by MessageItem
+const transformedChatMembers = computed(() => {
+    if (!chatStore.currentChat?.members) return []
+    
+    return chatStore.currentChat.members.map(member => ({
+        user: typeof member.user === 'string' ? member.user : member.user.id,
+        user_name: typeof member.user === 'string' ? member.user_name || '' : `${member.user.first_name} ${member.user.last_name}`.trim(),
+        user_uuid: member.user_uuid,
+    }))
+})
 
 // Вычисляемые свойства
 const isVisible = computed({

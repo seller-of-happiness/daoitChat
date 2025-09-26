@@ -78,7 +78,7 @@ export class MessageApiService {
 
             return {
                 success: true,
-                data: message,
+                data: message as IMessage,
             }
         } catch (error) {
             return {
@@ -115,7 +115,7 @@ export class MessageApiService {
 
             return {
                 success: true,
-                data: message,
+                data: message as IMessage,
             }
         } catch (error) {
             return {
@@ -139,7 +139,7 @@ export class MessageApiService {
 
             return {
                 success: true,
-                data: updatedMessage,
+                data: updatedMessage as IMessage,
             }
         } catch (error) {
             return {
