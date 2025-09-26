@@ -1,21 +1,21 @@
 /*
  * WebSocket сервис для обработки центрифуго событий чат модуля
- * 
+ *
  * Обрабатывает:
  * - Новые сообщения
  * - Обновления чатов
  * - Изменения реакций
  * - Обновления участников
  * - Новые приглашения
- * 
+ *
  * Использует паттерн Observer для уведомления подписчиков
  */
 
 import type { IMessage, IChat, IChatInvitation } from '@/refactoring/modules/chat/types/IChat'
 
 // Типы событий WebSocket
-export type WebSocketEventType = 
-    | 'message' 
+export type WebSocketEventType =
+    | 'message'
     | 'new_message'
     | 'chat_updated'
     | 'reaction_added'
@@ -43,6 +43,7 @@ export interface WebSocketEventHandlers {
     onReactionUpdate?: (data: any) => void
     onMembershipUpdate?: (data: any) => void
     onNewInvitation?: (data: any) => void
+    onInvitationRemoved?: (data: any) => void
 }
 
 /**
@@ -122,7 +123,16 @@ export class ChatWebSocketService {
                 break
 
             case 'new_invite':
+            case 'invitation':
+            case 'new_invitation':
+            case 'chat_invitation':
                 this.handleNewInvitationEvent(data)
+                break
+
+            case 'invitation_removed':
+            case 'invitation_cancelled':
+            case 'invite_removed':
+                this.handleInvitationRemovedEvent(data)
                 break
 
             default:
@@ -201,11 +211,32 @@ export class ChatWebSocketService {
      */
     private handleNewInvitationEvent(data: WebSocketEventData): void {
         try {
+            console.log('[ChatWebSocketService] Получено событие нового приглашения:', data)
+
             if (this.handlers.onNewInvitation) {
                 this.handlers.onNewInvitation(data)
+            } else {
+                console.warn('[ChatWebSocketService] Обработчик onNewInvitation не установлен')
             }
         } catch (error) {
             console.warn('Ошибка обработки события нового приглашения:', error)
+        }
+    }
+
+    /**
+     * Обрабатывает событие удаления приглашения
+     */
+    private handleInvitationRemovedEvent(data: WebSocketEventData): void {
+        try {
+            console.log('[ChatWebSocketService] Получено событие удаления приглашения:', data)
+
+            if (this.handlers.onInvitationRemoved) {
+                this.handlers.onInvitationRemoved(data)
+            } else {
+                console.warn('[ChatWebSocketService] Обработчик onInvitationRemoved не установлен')
+            }
+        } catch (error) {
+            console.warn('Ошибка обработки события удаления приглашения:', error)
         }
     }
 
@@ -217,7 +248,7 @@ export class ChatWebSocketService {
             // Fallback: если нет event_type, но есть id и content - считаем новым сообщением
             if (data?.id && data?.content !== undefined && this.handlers.onNewMessage) {
                 this.handlers.onNewMessage(data as IMessage, data.chat_id)
-            } 
+            }
             // Fallback: если есть message_id и reaction_type - считаем обновлением реакции
             else if (
                 data?.message_id &&
@@ -225,6 +256,10 @@ export class ChatWebSocketService {
                 this.handlers.onReactionUpdate
             ) {
                 this.handlers.onReactionUpdate(data)
+            }
+            // Fallback: если есть chat и created_by - возможно это приглашение
+            else if (data?.chat && data?.created_by && this.handlers.onNewInvitation) {
+                this.handlers.onNewInvitation(data)
             }
         } catch (error) {
             console.warn('Ошибка обработки fallback события:', error)

@@ -1,9 +1,9 @@
 /*
  * Главный композибл чат модуля
- * 
+ *
  * Предоставляет единый API для работы с чатами, объединяя все специализированные сторы.
  * Этот композибл является единой точкой входа для компонентов Vue.
- * 
+ *
  * Основные функции:
  * - Проксирование методов из разных сторов
  * - Предоставление единого API для компонентов
@@ -17,7 +17,13 @@ import { useMessagesStore } from '@/refactoring/modules/chat/stores/messagesStor
 import { useMembersStore } from '@/refactoring/modules/chat/stores/membersStore'
 import { useSearchStore } from '@/refactoring/modules/chat/stores/searchStore'
 import { useRealtimeStore } from '@/refactoring/modules/chat/stores/realtimeStore'
-import type { IChat, IMessage, IReactionType, IChatInvitation, ISearchResults } from '@/refactoring/modules/chat/types/IChat'
+import type {
+    IChat,
+    IMessage,
+    IReactionType,
+    IChatInvitation,
+    ISearchResults,
+} from '@/refactoring/modules/chat/types/IChat'
 
 export function useChatModule() {
     // Получаем все специализированные сторы
@@ -89,7 +95,11 @@ export function useChatModule() {
      * Открывает чат
      */
     const openChat = async (chatOrId: IChat | number): Promise<void> => {
-        await chatStore.openChat(chatOrId)
+        if (typeof chatOrId === 'number') {
+            await chatStore.openChatById(chatOrId)
+        } else {
+            await chatStore.openChat(chatOrId)
+        }
     }
 
     /**
@@ -147,14 +157,22 @@ export function useChatModule() {
     /**
      * Отправляет сообщение с файлами
      */
-    const sendMessageWithFiles = async (chatId: number, content: string, files: File[]): Promise<IMessage | null> => {
+    const sendMessageWithFiles = async (
+        chatId: number,
+        content: string,
+        files: File[],
+    ): Promise<IMessage | null> => {
         return await messagesStore.sendMessageWithFiles(chatId, content, files)
     }
 
     /**
      * Обновляет сообщение
      */
-    const updateMessage = async (chatId: number, messageId: number, content: string): Promise<IMessage | null> => {
+    const updateMessage = async (
+        chatId: number,
+        messageId: number,
+        content: string,
+    ): Promise<IMessage | null> => {
         return await messagesStore.updateMessage(chatId, messageId, content)
     }
 
@@ -191,7 +209,10 @@ export function useChatModule() {
     /**
      * Устанавливает эксклюзивную реакцию
      */
-    const setExclusiveReaction = async (messageId: number, reactionTypeId: number): Promise<void> => {
+    const setExclusiveReaction = async (
+        messageId: number,
+        reactionTypeId: number,
+    ): Promise<void> => {
         await messagesStore.setExclusiveReaction(messageId, reactionTypeId)
     }
 
@@ -234,38 +255,26 @@ export function useChatModule() {
      * Добавляет участников в чат
      */
     const addMembersToChat = async (chatId: number, userIds: string[]): Promise<boolean> => {
-        const success = await membersStore.addMembersToChat(chatId, userIds)
-        if (success) {
-            // Обновляем информацию о чате
-            const updatedChat = await chatStore.fetchChat(chatId)
-            const chatIndex = chatStore.chats.findIndex(c => c.id === chatId)
-            if (chatIndex !== -1) {
-                chatStore.chats.splice(chatIndex, 1, updatedChat)
-            }
-            if (chatStore.currentChat?.id === chatId) {
-                chatStore.currentChat = updatedChat
-            }
+        try {
+            await chatStore.addMembersToChat(chatId, userIds)
+            return true
+        } catch (error) {
+            console.error('Error adding members to chat:', error)
+            return false
         }
-        return success
     }
 
     /**
      * Удаляет участника из чата
      */
     const removeMemberFromChat = async (chatId: number, userId: string): Promise<boolean> => {
-        const success = await membersStore.removeMemberFromChat(chatId, userId)
-        if (success) {
-            // Обновляем информацию о чате
-            const updatedChat = await chatStore.fetchChat(chatId)
-            const chatIndex = chatStore.chats.findIndex(c => c.id === chatId)
-            if (chatIndex !== -1) {
-                chatStore.chats.splice(chatIndex, 1, updatedChat)
-            }
-            if (chatStore.currentChat?.id === chatId) {
-                chatStore.currentChat = updatedChat
-            }
+        try {
+            await chatStore.removeMemberFromChat(chatId, userId)
+            return true
+        } catch (error) {
+            console.error('Error removing member from chat:', error)
+            return false
         }
-        return success
     }
 
     // ============ МЕТОДЫ ПОИСКА ============
@@ -280,7 +289,10 @@ export function useChatModule() {
     /**
      * Выполняет поиск с немедленным результатом
      */
-    const searchImmediate = async (query: string, includePublic: boolean = true): Promise<ISearchResults | null> => {
+    const searchImmediate = async (
+        query: string,
+        includePublic: boolean = true,
+    ): Promise<ISearchResults | null> => {
         return await searchStore.searchImmediate(query, includePublic)
     }
 
@@ -376,7 +388,7 @@ export function useChatModule() {
         invitations,
         searchResults,
         reactionTypes,
-        
+
         // Флаги состояния
         isLoadingChats,
         isLoadingMessages,
@@ -385,7 +397,7 @@ export function useChatModule() {
         isSearching,
         isInitialized,
         isConnected,
-        
+
         // Вычисляемые свойства
         totalUnreadCount,
         activeInvitationsCount,

@@ -1,6 +1,6 @@
 /*
  * API сервис для работы с чатами
- * 
+ *
  * Содержит все HTTP методы для CRUD операций с чатами:
  * - Загрузка списка чатов
  * - Создание диалогов, групп и каналов
@@ -13,10 +13,7 @@
 
 import axios, { AxiosInstance } from 'axios'
 import { BASE_URL } from '@/refactoring/environment/environment'
-import type {
-    IChat,
-    ISearchResults,
-} from '@/refactoring/modules/chat/types/IChat'
+import type { IChat, ISearchResults } from '@/refactoring/modules/chat/types/IChat'
 import type {
     ChatsApiResponse,
     ChatApiResponse,
@@ -47,7 +44,9 @@ export class ChatApiService {
      */
     async fetchChats(): Promise<ChatApiResult<IChat[]>> {
         try {
-            const response = await this.axiosInstance.get<ChatsApiResponse>(`${BASE_URL}/api/chat/chat/`)
+            const response = await this.axiosInstance.get<ChatsApiResponse>(
+                `${BASE_URL}/api/chat/chat/`,
+            )
             const chatsData = response.data?.results ?? response.data
 
             if (Array.isArray(chatsData)) {
@@ -77,11 +76,11 @@ export class ChatApiService {
         try {
             const response = await this.axiosInstance.post<ChatApiResponse>(
                 `${BASE_URL}/api/chat/chat/dialog/`,
-                payload
+                payload,
             )
-            
+
             // В зависимости от ответа API может вернуть объект chat или напрямую данные чата
-            const chat = response.data.chat || response.data
+            const chat = (response.data as any).chat || response.data
 
             return {
                 success: true,
@@ -110,9 +109,9 @@ export class ChatApiService {
                 form,
                 {
                     headers: { 'Content-Type': 'multipart/form-data' },
-                }
+                },
             )
-            
+
             const chat = response.data?.results ?? response.data
 
             return {
@@ -142,9 +141,9 @@ export class ChatApiService {
                 form,
                 {
                     headers: { 'Content-Type': 'multipart/form-data' },
-                }
+                },
             )
-            
+
             const chat = response.data?.results ?? response.data
 
             return {
@@ -165,9 +164,9 @@ export class ChatApiService {
     async fetchChat(chatId: number): Promise<ChatApiResult<IChat>> {
         try {
             const response = await this.axiosInstance.get<ChatApiResponse>(
-                `${BASE_URL}/api/chat/chat/${chatId}/`
+                `${BASE_URL}/api/chat/chat/${chatId}/`,
             )
-            
+
             const chat = response.data?.results ?? response.data
 
             return {
@@ -205,9 +204,9 @@ export class ChatApiService {
                 form,
                 {
                     headers: { 'Content-Type': 'multipart/form-data' },
-                }
+                },
             )
-            
+
             const updatedChat = response.data?.results ?? response.data
 
             return {
@@ -243,11 +242,14 @@ export class ChatApiService {
     /**
      * Добавляет участников в чат (отправляет приглашения)
      */
-    async addMembersToChat(chatId: number, payload: AddMembersPayload): Promise<ChatApiResult<void>> {
+    async addMembersToChat(
+        chatId: number,
+        payload: AddMembersPayload,
+    ): Promise<ChatApiResult<void>> {
         try {
             await this.axiosInstance.post(
                 `${BASE_URL}/api/chat/chat/${chatId}/add-members/`,
-                payload
+                payload,
             )
 
             return {
@@ -267,7 +269,7 @@ export class ChatApiService {
     async removeMemberFromChat(chatId: number, userId: string): Promise<ChatApiResult<void>> {
         try {
             await this.axiosInstance.delete(
-                `${BASE_URL}/api/chat/chat/${chatId}/remove-member/?user_id=${userId}`
+                `${BASE_URL}/api/chat/chat/${chatId}/remove-member/?user_id=${userId}`,
             )
 
             return {
@@ -299,7 +301,7 @@ export class ChatApiService {
             })
 
             const response = await this.axiosInstance.get<SearchApiResponse>(
-                `${BASE_URL}/api/chat/chat/search/?${urlParams.toString()}`
+                `${BASE_URL}/api/chat/chat/search/?${urlParams.toString()}`,
             )
 
             return {
@@ -321,9 +323,9 @@ export class ChatApiService {
     async fetchUnreadCounts(): Promise<ChatApiResult<UnreadCountsResponse>> {
         try {
             const response = await this.axiosInstance.get<UnreadCountsApiResponse>(
-                `${BASE_URL}/api/chat/chat/unread-counts/`
+                `${BASE_URL}/api/chat/chat/unread-counts/`,
             )
-            
+
             const unreadData = response.data?.results ?? response.data
 
             return {

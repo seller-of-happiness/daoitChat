@@ -153,30 +153,36 @@ export function toApiDate(date?: Date | string | null): string | null {
  * formatResponsibilityDate("2025-08-14T10:00:00Z") -> "14 авг, 10:00"
  * formatResponsibilityDate({_custom: {value: "2025-08-14T10:00:00Z"}}) -> "14 авг, 10:00"
  */
-export const formatResponsibilityDate = (dateTime: string | {_custom?: {value: string}} | null | undefined): string => {
+export const formatResponsibilityDate = (
+    dateTime: string | { _custom?: { value: string } } | null | undefined,
+): string => {
     // Извлекаем строку даты
-    let dateString: string | null = null;
+    let dateString: string | null = null
 
-    if (typeof dateTime === 'object' && dateTime && '_custom' in dateTime && dateTime._custom?.value) {
-        dateString = dateTime._custom.value;
+    if (
+        typeof dateTime === 'object' &&
+        dateTime &&
+        '_custom' in dateTime &&
+        dateTime._custom?.value
+    ) {
+        dateString = dateTime._custom.value
     } else if (typeof dateTime === 'string') {
-        dateString = dateTime;
+        dateString = dateTime
     }
 
-    if (!dateString) return '';
+    if (!dateString) return ''
 
     // Создаем Date объект с явным приведением типов
-    const date = new Date(dateString as string);
-    if (isNaN(date.getTime())) return '';
+    const date = new Date(dateString as string)
+    if (isNaN(date.getTime())) return ''
 
-    const day = date.getDate();
-    const month = date.toLocaleString('ru-RU', { month: 'short' }).replace('.', '');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const day = date.getDate()
+    const month = date.toLocaleString('ru-RU', { month: 'short' }).replace('.', '')
+    const hours = String(date.getHours()).padStart(2, '0')
+    const minutes = String(date.getMinutes()).padStart(2, '0')
 
-    return `${day} ${month}, ${hours}:${minutes}`;
-};
-
+    return `${day} ${month}, ${hours}:${minutes}`
+}
 
 /**
  * Форматирует ФИО в сокращенный вид "Фамилия И.О."
@@ -204,15 +210,27 @@ export const formatShortName = (employee: {
     return `${lastName} ${firstNameInitial}${middleNameInitial}`.trim()
 }
 
-
 /**
  * Форматирует дату в формате "дд.мм.гггг" (без времени)
  * @param {string|Date|null} date - Дата в ISO или Date
  * @returns {string} "15.03.1967" или пустая строка
  */
 export const formatDateOnly = (date: string | Date | null): string => {
-    if (!date) return '';
-    const d = new Date(date);
-    if (isNaN(d.getTime())) return '';
-    return d.toLocaleDateString('ru-RU');
-};
+    if (!date) return ''
+    const d = new Date(date)
+    if (isNaN(d.getTime())) return ''
+    return d.toLocaleDateString('ru-RU')
+}
+
+/**
+ * Очищает HTML теги из строки, оставляя только текст
+ * @param {string} str - Строка с HTML тегами
+ * @returns {string} Строка без HTML тегов
+ *
+ * Пример:
+ * stripHtmlTags("<p>Hello <b>world</b></p>") -> "Hello world"
+ */
+export const stripHtmlTags = (str: string): string => {
+    if (!str) return str
+    return str.replace(/<[^>]*>/g, '')
+}

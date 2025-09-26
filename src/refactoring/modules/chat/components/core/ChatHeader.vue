@@ -65,22 +65,10 @@
                 v-tooltip.bottom="'Пригласить пользователей'"
                 @click="$emit('invite-users')"
             />
-            
-            <!-- Кнопка диагностики WebSocket (только в dev режиме) -->
-            <Button
-                v-if="isDevelopment || showDebugTools"
-                icon="pi pi-cog"
-                severity="help"
-                text
-                rounded
-                size="small"
-                v-tooltip.bottom="'Диагностика WebSocket'"
-                @click="$emit('debug-websocket')"
-            />
 
             <!-- Счетчик участников -->
-            <div 
-                v-if="showMemberCount" 
+            <div
+                v-if="showMemberCount"
                 class="text-sm text-surface-500 px-2 cursor-pointer hover:text-surface-700 dark:hover:text-surface-300 transition-colors rounded-md hover:bg-surface-100 dark:hover:bg-surface-700"
                 @click="$emit('show-members')"
                 v-tooltip.bottom="'Показать участников'"
@@ -88,8 +76,6 @@
                 <i class="pi pi-users mr-1"></i>
                 Участников: {{ memberCount }}
             </div>
-
-
         </div>
     </div>
 </template>
@@ -114,20 +100,12 @@ interface Emits {
     (e: 'invite-users'): void
     (e: 'manage-chat'): void
     (e: 'show-members'): void
-    (e: 'debug-websocket'): void
 }
 
 const props = defineProps<Props>()
 defineEmits<Emits>()
 
 const { id: currentUserId } = useCurrentUser()
-
-// Показываем debug инструменты в dev режиме или при необходимости
-const showDebugTools = ref(false)
-
-// Проверка dev режима (для использования в template)
-const isDevelopment = computed(() => import.meta.env.DEV)
-
 
 // Используем композабл для звука
 const {
@@ -142,7 +120,6 @@ const {
 // Используем композабл для определения названия и иконки
 const currentChatRef = computed(() => props.currentChat)
 const { chatTitle: chatName, chatIcon, isCurrentUserAdmin } = useChatTitle(currentChatRef)
-
 
 // Инициалы для чата
 const chatInitials = computed(() => {
@@ -211,7 +188,6 @@ const canManageChat = computed(() => {
     const canEdit = canUserPerformAction(props.currentChat, currentUserId.value, 'edit')
     return canEdit
 })
-
 </script>
 
 <style lang="scss" scoped>
@@ -236,7 +212,6 @@ const canManageChat = computed(() => {
     font-weight: 600;
     flex-shrink: 0;
 }
-
 
 // Стили для кнопки звука, требующей активации
 .sound-needs-activation {

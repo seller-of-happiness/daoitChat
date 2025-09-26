@@ -1,554 +1,502 @@
 <template>
     <Dialog
-        :visible="visible"
-        header="Управление"
-        :modal="true"
-        :style="{ width: '700px', maxHeight: '80vh' }"
-        :appendTo="'body'"
-        :baseZIndex="9995"
-        class="sliding-chat-modal"
-        @update:visible="$emit('update:visible', $event)"
+        v-model:visible="isVisible"
+        modal
+        header="Управление участниками"
+        :style="{ width: '50rem', minHeight: '60vh' }"
+        :breakpoints="{ '1199px': '75vw', '575px': '90vw' }"
+        :closable="true"
     >
-        <div class="space-y-4">
-            <!-- Информация о чате -->
-            <div v-if="chat" class="chat-info bg-surface-50 dark:bg-surface-800 p-4 rounded-lg">
-                <div class="flex items-center gap-3">
-                    <img v-if="chat.icon" :src="withBase(chat.icon)" alt="icon" class="chat-icon" />
-                    <div v-else class="chat-icon-initials">
-                        {{ chatInitials }}
-                    </div>
-                    <div>
-                        <h3 class="font-semibold text-lg">{{ chat.title }}</h3>
-                        <p class="text-sm text-surface-600 dark:text-surface-400">
-                            {{ chatTypeLabel }} • {{ totalMembers }} участников
-                        </p>
-                    </div>
-                </div>
-            </div>
+        <div v-if="!chat" class="text-center p-4">
+            <p class="text-surface-500">Чат не выбран</p>
+        </div>
 
-            <!-- Вкладки -->
-            <div class="flex border-b border-surface-200 dark:border-surface-800">
-                <button
-                    v-for="tab in tabs"
-                    :key="tab.key"
-                    :class="[
-                        'px-4 py-2 font-medium text-sm border-b-2 transition-colors',
-                        activeTab === tab.key
-                            ? 'border-primary-500 text-primary-500'
-                            : 'border-transparent text-surface-600 dark:text-surface-400 hover:text-surface-900 dark:hover:text-surface-100',
-                    ]"
-                    @click="activeTab = tab.key"
-                >
-                    {{ tab.label }}
-                    <span v-if="tab.count !== undefined" class="ml-1 text-xs opacity-75">
-                        ({{ tab.count }})
-                    </span>
-                </button>
-            </div>
+        <div v-else class="space-y-6">
+            <TabView>
+                <TabPanel header="Участники">
+                    <div class="space-y-4">
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-lg font-medium">
+                                Участники ({{ chatMembers.length }})
+                            </h3>
+                            <Button
+                                label="Пригласить"
+                                icon="pi pi-plus"
+                                size="small"
+                                @click="showInviteDialog = true"
+                            />
+                        </div>
 
-            <!-- Участники -->
-            <div v-if="activeTab === 'members'" class="members-tab">
-                <!-- Поиск участников -->
-                <div class="mb-4">
-                    <app-inputtext
-                        v-model="membersSearchQuery"
-                        placeholder="Поиск участников..."
-                        class="w-full"
-                    >
-                        <template #prefix>
-                            <i class="pi pi-search text-surface-400"></i>
-                        </template>
-                    </app-inputtext>
-                </div>
-
-                <!-- Список участников -->
-                <div class="members-list max-h-96 overflow-y-auto">
-                    <div
-                        v-for="member in filteredMembers"
-                        :key="member.user.id"
-                        class="member-item flex items-center justify-between bg-surface-50 dark:bg-surface-800 p-4 rounded-lg mt-4"
-                    >
-                        <div class="flex items-center gap-3">
-                            <div class="member-avatar">
-                                <i class="pi pi-user"></i>
-                            </div>
-                            <div>
-                                <div class="font-medium">
-                                    {{ getMemberDisplayName(member) }}
-                                    <span v-if="member.is_admin" class="admin-badge">
-                                        <i class="pi pi-crown text-xs"></i>
-                                        Admin
-                                    </span>
+                        <div class="space-y-2 max-h-60 overflow-y-auto">
+                            <div
+                                v-for="member in chatMembers"
+                                :key="getMemberKey(member)"
+                                class="flex items-center justify-between p-3 border border-surface-200 rounded-lg"
+                            >
+                                <div class="flex items-center gap-3">
+                                    <Avatar
+                                        :label="getMemberInitials(member)"
+                                        class="bg-primary text-primary-contrast"
+                                        size="normal"
+                                        shape="circle"
+                                    />
+                                    <div>
+                                        <div class="font-medium">
+                                            {{ getMemberDisplayName(member) }}
+                                        </div>
+                                        <div class="text-sm text-surface-500">
+                                            Присоединился {{ formatJoinDate(member.joined_at) }}
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="text-sm text-surface-500">
-                                    Присоединился {{ formatJoinDate(member.joined_at) }}
-                                </div>
-                            </div>
-                        </div>
 
-                        <!-- Действия с участником -->
-                        <div class="flex items-center gap-2">
-                            <Button
-                                v-if="
-                                    canManageMembers && !member.is_admin && !isCurrentUser(member)
-                                "
-                                icon="pi pi-crown"
-                                size="small"
-                                severity="secondary"
-                                text
-                                v-tooltip.left="'Сделать администратором'"
-                                @click="makeAdmin(member)"
-                            />
-                            <Button
-                                v-if="canManageMembers && !isCurrentUser(member)"
-                                icon="pi pi-trash"
-                                size="small"
-                                severity="danger"
-                                text
-                                v-tooltip.left="'Удалить из чата'"
-                                @click="removeMember(member)"
-                                :loading="removingMembers.has(member.user.id)"
-                            />
-                        </div>
-                    </div>
+                                <div class="flex items-center gap-2">
+                                    <Tag
+                                        v-if="member.is_admin"
+                                        value="Администратор"
+                                        severity="info"
+                                        class="text-xs"
+                                    />
 
-                    <!-- Пустое состояние -->
-                    <div
-                        v-if="filteredMembers.length === 0"
-                        class="text-center py-8 text-surface-500"
-                    >
-                        <i class="pi pi-users text-4xl mb-4 block"></i>
-                        <div>Участники не найдены</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Приглашения -->
-            <div v-if="activeTab === 'invites'" class="invites-tab">
-                <!-- Кнопка добавления участников -->
-                <div class="mb-4">
-                    <Button
-                        icon="pi pi-user-plus"
-                        label="Пригласить участников"
-                        @click="showInviteDialog = true"
-                        :disabled="!canManageMembers"
-                    />
-                </div>
-
-                <!-- Список приглашений -->
-                <div class="invites-list max-h-96 overflow-y-auto">
-                    <div
-                        v-for="invite in pendingInvites"
-                        :key="invite.id"
-                        class="invite-item flex items-center justify-between p-3 border-b border-surface-100 dark:border-surface-700"
-                    >
-                        <div class="flex items-center gap-3">
-                            <div class="member-avatar">
-                                <i class="pi pi-clock text-orange-500"></i>
-                            </div>
-                            <div>
-                                <div class="font-medium">
-                                    {{ getInviteeDisplayName(invite) }}
-                                </div>
-                                <div class="text-sm text-surface-500">
-                                    Приглашен
-                                    {{
-                                        ('created_by' in invite && invite.created_by)
-                                            ? getCreatedByName(invite.created_by)
-                                            : 'неизвестно кем'
-                                    }}
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Действия с приглашением -->
-                        <div class="flex items-center gap-2">
-                            <Button
-                                v-if="canManageMembers"
-                                icon="pi pi-times"
-                                size="small"
-                                severity="danger"
-                                text
-                                v-tooltip.left="'Отозвать приглашение'"
-                                @click="removeInvite(invite)"
-                                :loading="removingInvites.has(invite.id || 0)"
-                            />
-                        </div>
-                    </div>
-
-                    <!-- Пустое состояние -->
-                    <div
-                        v-if="pendingInvites.length === 0"
-                        class="text-center py-8 text-surface-500"
-                    >
-                        <i class="pi pi-envelope text-4xl mb-4 block"></i>
-                        <div>Нет ожидающих приглашений</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Настройки -->
-            <div v-if="activeTab === 'settings'" class="settings-tab">
-                <div class="space-y-4">
-                    <!-- Редактирование информации о чате -->
-                    <div class="setting-group">
-                        <h4 class="font-semibold mb-3">
-                            Информация о {{ chatTypeLabel.toLowerCase() }}
-                        </h4>
-
-                        <div class="space-y-3">
-                            <div>
-                                <label class="block text-sm font-medium mb-1">Название</label>
-                                <app-inputtext
-                                    v-model="editedTitle"
-                                    :disabled="!canEditChat"
-                                    class="w-full"
-                                />
-                            </div>
-
-                            <div>
-                                <label class="block text-sm font-medium mb-1">Описание</label>
-                                <textarea
-                                    v-model="editedDescription"
-                                    :disabled="!canEditChat"
-                                    class="p-inputtext p-inputtextarea w-full"
-                                    rows="3"
-                                />
-                            </div>
-                        </div>
-
-                        <div v-if="canEditChat" class="flex justify-end gap-2 mt-4">
-                            <Button
-                                label="Отменить"
-                                severity="secondary"
-                                text
-                                size="small"
-                                @click="resetEditedInfo"
-                                :disabled="!hasInfoChanges"
-                            />
-                            <Button
-                                label="Сохранить"
-                                size="small"
-                                @click="saveEditedInfo"
-                                :disabled="!hasInfoChanges || isSavingInfo"
-                                :loading="isSavingInfo"
-                            />
-                        </div>
-                    </div>
-
-                    <!-- Опасные действия -->
-                    <div v-if="canEditChat" class="setting-group pt-4">
-                        <div
-                            class="bg-red-50 dark:bg-red-900/20 border border-[#ff5252] dark:border-red-800 rounded-lg p-4"
-                        >
-                            <div class="flex items-start gap-3">
-                                <i
-                                    class="pi pi-exclamation-triangle !text-5xl text-[#ff5252] mt-1"
-                                ></i>
-                                <div class="flex-1 ml-3">
-                                    <h5 class="font-medium text-red-800 dark:text-red-200">
-                                        Удалить
-                                    </h5>
-                                    <p class="text-sm text-red-700 dark:text-red-300 mt-1">
-                                        Это действие нельзя отменить. Все сообщения и файлы будут
-                                        удалены безвозвратно.
-                                    </p>
                                     <Button
-                                        label="Удалить"
+                                        v-if="canRemoveMember(member)"
+                                        icon="pi pi-times"
                                         severity="danger"
                                         size="small"
-                                        class="mt-3"
-                                        @click="deleteChat"
+                                        text
+                                        rounded
+                                        :loading="isRemovingMember(member)"
+                                        @click="startRemoveMember(member)"
                                     />
                                 </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            </div>
+                </TabPanel>
+
+                <TabPanel header="Отправленные приглашения" v-if="canManageChat">
+                    <div class="space-y-4">
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-lg font-medium">
+                                Отправленные приглашения ({{ chatInvitations.length }})
+                            </h3>
+                            <div class="flex gap-2">
+                                <Button
+                                    label="Debug API"
+                                    icon="pi pi-cog"
+                                    severity="info"
+                                    size="small"
+                                    text
+                                    @click="debugInvitations"
+                                />
+                                <Button
+                                    label="Отозвать все"
+                                    icon="pi pi-times"
+                                    severity="danger"
+                                    size="small"
+                                    :loading="isRecallingAllInvites"
+                                    :disabled="chatInvitations.length === 0"
+                                    @click="recallAllInvites"
+                                />
+                            </div>
+                        </div>
+
+                        <div class="space-y-2 max-h-60 overflow-y-auto">
+                            <!-- Пустое состояние -->
+                            <div
+                                v-if="chatInvitations.length === 0"
+                                class="text-center py-8 text-surface-500"
+                            >
+                                <div class="mb-2">
+                                    <i class="pi pi-envelope text-4xl mb-4 block"></i>
+                                </div>
+                                <div class="mb-2 font-semibold">Нет отправленных приглашений</div>
+                                <div class="text-xs">
+                                    Используйте кнопку "Пригласить" в табе участников для отправки
+                                    приглашений
+                                </div>
+                            </div>
+
+                            <!-- Список приглашений -->
+                            <div
+                                v-for="invite in chatInvitations"
+                                :key="invite.id"
+                                class="flex items-center justify-between p-3 border border-surface-200 rounded-lg"
+                            >
+                                <div class="flex items-center gap-3">
+                                    <Avatar
+                                        :label="getInviteInitials(invite)"
+                                        class="bg-orange-500 text-white"
+                                        size="normal"
+                                        shape="circle"
+                                    />
+                                    <div>
+                                        <div class="font-medium">
+                                            {{ getInviteDisplayName(invite) }}
+                                        </div>
+                                        <div class="text-sm text-surface-500">
+                                            Приглашен {{ getCreatedByName(invite.created_by) }}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <Button
+                                    icon="pi pi-times"
+                                    severity="danger"
+                                    size="small"
+                                    text
+                                    rounded
+                                    :loading="isRemovingInvite(invite.id)"
+                                    v-tooltip.bottom="'Отозвать приглашение'"
+                                    @click="removeInvite(invite)"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </TabPanel>
+
+                <TabPanel header="Настройки">
+                    <div class="space-y-4">
+                        <h3 class="text-lg font-medium">
+                            Настройки {{ chat?.type === 'group' ? 'группы' : 'канала' }}
+                        </h3>
+
+                        <div class="space-y-4">
+                            <!-- Аватарка -->
+                            <div class="field">
+                                <label class="font-medium"
+                                    >Аватарка
+                                    {{ chat?.type === 'group' ? 'группы' : 'канала' }}</label
+                                >
+                                <div class="flex items-center gap-4 mt-2">
+                                    <Avatar
+                                        :image="currentAvatar"
+                                        :label="!currentAvatar ? getChatInitials() : undefined"
+                                        class="bg-primary text-primary-contrast"
+                                        size="xlarge"
+                                        shape="circle"
+                                    />
+                                    <div class="flex flex-col gap-2">
+                                        <FileUpload
+                                            mode="basic"
+                                            :maxFileSize="5000000"
+                                            accept="image/*"
+                                            :auto="true"
+                                            chooseLabel="Выбрать изображение"
+                                            class="p-0"
+                                            @upload="onAvatarUpload"
+                                            @select="onAvatarSelect"
+                                        />
+                                        <Button
+                                            v-if="currentAvatar"
+                                            label="Удалить аватарку"
+                                            icon="pi pi-trash"
+                                            severity="secondary"
+                                            size="small"
+                                            text
+                                            @click="removeAvatar"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Название -->
+                            <div class="field">
+                                <label for="chat-title" class="font-medium">Название</label>
+                                <InputText
+                                    id="chat-title"
+                                    v-model="editedTitle"
+                                    class="w-full"
+                                    placeholder="Введите название"
+                                />
+                            </div>
+
+                            <!-- Описание -->
+                            <div class="field">
+                                <label for="chat-description" class="font-medium">Описание</label>
+                                <Textarea
+                                    id="chat-description"
+                                    v-model="editedDescription"
+                                    class="w-full"
+                                    rows="3"
+                                    placeholder="Введите описание"
+                                />
+                            </div>
+
+                            <!-- Кнопка сохранения -->
+                            <Button
+                                label="Сохранить изменения"
+                                icon="pi pi-save"
+                                :loading="isSavingSettings"
+                                :disabled="!hasChanges"
+                                @click="saveSettings"
+                            />
+                        </div>
+                    </div>
+                </TabPanel>
+            </TabView>
         </div>
 
-        <!-- Подтверждение удаления участника -->
-        <Dialog
-            :visible="showRemoveMemberDialog"
+        <InviteUsersDialog
+            v-model:visible="showInviteDialog"
+            :chat="chat"
+            @invite-users="handleInviteUsers"
+        />
+
+        <ConfirmDialog
+            v-model:visible="showRemoveConfirm"
             header="Удалить участника"
-            :modal="true"
-            :style="{ width: '400px' }"
-            @update:visible="showRemoveMemberDialog = $event"
-        >
-            <div class="flex items-start gap-3">
-                <i class="pi pi-exclamation-triangle text-orange-500 text-xl mt-1"></i>
-                <div>
-                    <p class="mb-3">
-                        Вы действительно хотите удалить
-                        <strong
-                            >{{ memberToRemove?.user.first_name }}
-                            {{ memberToRemove?.user.last_name }}</strong
-                        >
-                        из {{ chatTypeLabel.toLowerCase() }}?
-                    </p>
-                    <p class="text-sm text-surface-600 dark:text-surface-400">
-                        Участник сможет быть приглашен повторно.
-                    </p>
-                </div>
-            </div>
-
-            <template #footer>
-                <div class="flex justify-end gap-2">
-                    <Button
-                        label="Отмена"
-                        severity="secondary"
-                        text
-                        @click="showRemoveMemberDialog = false"
-                    />
-                    <Button
-                        label="Удалить"
-                        severity="danger"
-                        @click="confirmRemoveMember"
-                        :loading="isRemovingMember"
-                    />
-                </div>
-            </template>
-        </Dialog>
+            message="Вы уверены, что хотите удалить этого участника из чата?"
+            icon="pi pi-exclamation-triangle"
+            accept-label="Удалить"
+            reject-label="Отмена"
+            accept-class="p-button-danger"
+            @accept="confirmRemoveMember"
+        />
     </Dialog>
-
-    <!-- Диалог приглашения пользователей -->
-    <InviteUsersDialog
-        v-model:visible="showInviteDialog"
-        :chat="chat"
-        @invite-users="handleInviteUsers"
-    />
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { generateChatInitials, withBase } from '@/refactoring/modules/chat/utils/chatHelpers'
+import Dialog from 'primevue/dialog'
+import TabView from 'primevue/tabview'
+import TabPanel from 'primevue/tabpanel'
+import Button from 'primevue/button'
+import Avatar from 'primevue/avatar'
+import Tag from 'primevue/tag'
+import ConfirmDialog from 'primevue/confirmdialog'
+import InputText from 'primevue/inputtext'
+import Textarea from 'primevue/textarea'
+import FileUpload from 'primevue/fileupload'
+
 import { useChatStore } from '@/refactoring/modules/chat/stores/chatStore'
-import { useCurrentUser } from '@/refactoring/modules/chat/composables/useCurrentUser'
+import { useMembersStore } from '@/refactoring/modules/chat/stores/membersStore'
 import { useFeedbackStore } from '@/refactoring/modules/feedback/stores/feedbackStore'
+import { useCurrentUser } from '@/refactoring/modules/chat/composables/useCurrentUser'
+import { useUserStore } from '@/refactoring/modules/user/stores/userStore'
+import { stripHtmlTags } from '@/refactoring/utils/formatters'
+import { inviteApiService } from '@/refactoring/modules/chat/services/inviteApi'
 import InviteUsersDialog from './InviteUsersDialog.vue'
-import type { IChat, IChatMember, IChatInvitation, IChatInvite } from '@/refactoring/modules/chat/types/IChat'
+
+import type {
+    IChat,
+    IChatMember,
+    IChatInvitation,
+    IChatInvite,
+} from '@/refactoring/modules/chat/types/IChat'
 
 interface Props {
     visible: boolean
-    chat: IChat | null
+    chat?: IChat | null
 }
 
 interface Emits {
-    (e: 'update:visible', visible: boolean): void
-    (e: 'chat-updated', chat: IChat): void
+    (event: 'update:visible', value: boolean): void
+    (event: 'chat-updated', chat: IChat): void
 }
 
 const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 
-// Хранилища
 const chatStore = useChatStore()
+const membersStore = useMembersStore()
 const feedbackStore = useFeedbackStore()
-const { id: currentUserId } = useCurrentUser()
+const currentUser = useCurrentUser()
 
-// Состояние компонента
-const activeTab = ref<'members' | 'invites' | 'settings'>('members')
-const membersSearchQuery = ref('')
-const showRemoveMemberDialog = ref(false)
+const showInviteDialog = ref(false)
+const showRemoveConfirm = ref(false)
 const memberToRemove = ref<IChatMember | null>(null)
-const isRemovingMember = ref(false)
 const removingMembers = ref(new Set<string>())
 const removingInvites = ref(new Set<number>())
-const showInviteDialog = ref(false)
 
-// Редактирование информации о чате
+// Переменные для настроек
 const editedTitle = ref('')
 const editedDescription = ref('')
-const isSavingInfo = ref(false)
+const currentAvatar = ref('')
+const isSavingSettings = ref(false)
+const isRecallingAllInvites = ref(false)
 
-const chatInitials = computed(() => {
-    return props.chat ? generateChatInitials(props.chat.title) : ''
+const isVisible = computed({
+    get: () => props.visible,
+    set: (value: boolean) => emit('update:visible', value),
 })
 
-const chatTypeLabel = computed(() => {
-    if (!props.chat) return 'Чат'
-    switch (props.chat.type) {
-        case 'group':
-            return 'Группа'
-        case 'channel':
-            return 'Канал'
-        case 'direct':
-        case 'dialog':
-            return 'Диалог'
-        default:
-            return 'Чат'
-    }
-})
+const chatMembers = computed(() => props.chat?.members || [])
+const chatInvitations = computed(() => {
+    // Получаем исходящие приглашения для текущего чата
+    if (!props.chat?.id) return []
 
-const totalMembers = computed(() => {
-    return props.chat?.members?.length || 0
-})
-
-const pendingInvites = computed(() => {
-    return props.chat?.invites?.filter((invite) => !invite.is_accepted) || []
-})
-
-const tabs = computed(() => [
-    {
-        key: 'members' as const,
-        label: 'Участники',
-        count: totalMembers.value,
-    },
-    {
-        key: 'invites' as const,
-        label: 'Приглашения',
-        count: pendingInvites.value.length,
-    },
-    {
-        key: 'settings' as const,
-        label: 'Настройки',
-    },
-])
-
-const filteredMembers = computed(() => {
-    if (!props.chat?.members) return []
-
-    const query = membersSearchQuery.value.toLowerCase().trim()
-    if (!query) return props.chat.members
-
-    return props.chat.members.filter((member) => {
-        const displayName = getMemberDisplayName(member).toLowerCase()
-        return displayName.includes(query)
+    console.log('[ChatMembersManagement] Debugging sent invitations:', {
+        chatId: props.chat.id,
+        sentInvitations: membersStore.sentInvitations,
+        chatObject: props.chat,
     })
-})
 
-const canManageMembers = computed(() => {
-    if (!props.chat || !currentUserId.value) return false
+    // Сначала попробуем из объекта чата (если приглашения встроены)
+    if (props.chat.invitations && Array.isArray(props.chat.invitations)) {
+        console.log('[ChatMembersManagement] Using chat.invitations:', props.chat.invitations)
+        return props.chat.invitations
+    }
 
-    // Проверяем, является ли текущий пользователь администратором
-    const currentMember = props.chat.members?.find(
-        (member) => member.user.id === currentUserId.value,
+    // Используем исходящие приглашения из membersStore (уже отфильтрованные по created_by)
+    const sentFiltered = membersStore.sentInvitations.filter(
+        (inv) => inv.chat.id === props.chat!.id,
     )
+    console.log('[ChatMembersManagement] Using filtered sentInvitations:', sentFiltered)
+    return sentFiltered
+})
+const hasInvitations = computed(() => chatInvitations.value.length > 0)
+
+const getMemberKey = (member: IChatMember): string => {
+    const userId = typeof member.user === 'string' ? member.user : member.user.id
+    return `member-${userId}-${member.joined_at}`
+}
+
+const getMemberDisplayName = (member: IChatMember): string => {
+    if (typeof member.user === 'string') return member.user
+
+    const { first_name, last_name, middle_name } = member.user
+    const fullName =
+        [first_name, middle_name, last_name].filter(Boolean).join(' ') || 'Пользователь'
+    return stripHtmlTags(fullName)
+}
+
+const getMemberInitials = (member: IChatMember): string => {
+    const name = getMemberDisplayName(member)
+    return name
+        .split(' ')
+        .slice(0, 2)
+        .map((word) => word.charAt(0).toUpperCase())
+        .join('')
+}
+
+const getInviteDisplayName = (invite: IChatInvite | IChatInvitation): string => {
+    if (!invite.invited_user) return 'Неизвестный пользователь'
+
+    const { first_name, last_name, middle_name } = invite.invited_user
+    const fullName =
+        [first_name, middle_name, last_name].filter(Boolean).join(' ') || 'Пользователь'
+    return stripHtmlTags(fullName)
+}
+
+const getInviteInitials = (invite: IChatInvite | IChatInvitation): string => {
+    const name = getInviteDisplayName(invite)
+    return name
+        .split(' ')
+        .slice(0, 2)
+        .map((word) => word.charAt(0).toUpperCase())
+        .join('')
+}
+
+const getCreatedByName = (createdBy: any): string => {
+    if (!createdBy) return 'неизвестно кем'
+
+    const { first_name, last_name, middle_name } = createdBy
+    const fullName =
+        [first_name, middle_name, last_name].filter(Boolean).join(' ') || 'неизвестно кем'
+    return stripHtmlTags(fullName)
+}
+
+const formatJoinDate = (joinedAt: string): string => {
+    try {
+        return new Date(joinedAt).toLocaleDateString('ru-RU')
+    } catch {
+        return 'неизвестно'
+    }
+}
+
+const canRemoveMember = (member: IChatMember): boolean => {
+    if (!props.chat || !currentUser.id.value) return false
+
+    const currentUserId = currentUser.id.value
+    const memberUserId = typeof member.user === 'string' ? member.user : member.user.id
+
+    // Нельзя удалить себя
+    if (memberUserId === currentUserId) return false
+
+    // Проверяем права администратора
+    const currentMember = props.chat.members?.find((m) => {
+        const userId = typeof m.user === 'string' ? m.user : m.user.id
+        return userId === currentUserId
+    })
+
+    return currentMember?.is_admin || false
+}
+
+const canManageChat = computed((): boolean => {
+    if (!props.chat || !currentUser.id.value) return false
+
+    const currentUserId = currentUser.id.value
+
+    // Проверяем права администратора
+    const currentMember = props.chat.members?.find((m) => {
+        const userId = typeof m.user === 'string' ? m.user : m.user.id
+        return userId === currentUserId
+    })
 
     return currentMember?.is_admin || false
 })
 
-const canEditChat = computed(() => {
-    return canManageMembers.value
-})
-
-const hasInfoChanges = computed(() => {
-    if (!props.chat) return false
-    return (
-        editedTitle.value !== props.chat.title ||
-        editedDescription.value !== (props.chat.description || '')
-    )
-})
-
-// Вспомогательные функции
-
-/**
- * Очищает HTML теги из строки, оставляя только текст
- */
-const stripHtmlTags = (str: string): string => {
-    if (!str) return str
-    return str.replace(/<[^>]*>/g, '')
+const isRemovingMember = (member: IChatMember): boolean => {
+    const userId = typeof member.user === 'string' ? member.user : member.user.id
+    return removingMembers.value.has(userId)
 }
 
-const getMemberDisplayName = (member: IChatMember): string => {
-    const { first_name, last_name, middle_name } = member.user
-    const fullName = [first_name, middle_name, last_name].filter(Boolean).join(' ') || 'Пользователь'
-    return stripHtmlTags(fullName)
+const isRemovingInvite = (inviteId: number): boolean => {
+    return removingInvites.value.has(inviteId)
 }
 
-const getInviteeDisplayName = (invite: IChatInvite | IChatInvitation): string => {
-    if (!invite.invited_user) return 'Неизвестный пользователь'
-    const { first_name, last_name, middle_name } = invite.invited_user
-    const fullName = [first_name, middle_name, last_name].filter(Boolean).join(' ') || 'Пользователь'
-    return stripHtmlTags(fullName)
-}
-
-const getCreatedByName = (createdBy: any): string => {
-    const { first_name, last_name, middle_name } = createdBy
-    const fullName = [first_name, middle_name, last_name].filter(Boolean).join(' ') || 'неизвестно кем'
-    return stripHtmlTags(fullName)
-}
-
-const isCurrentUser = (member: IChatMember): boolean => {
-    return member.user.id === currentUserId.value
-}
-
-const formatJoinDate = (dateString: string): string => {
-    try {
-        const date = new Date(dateString)
-        return date.toLocaleDateString('ru-RU', {
-            day: 'numeric',
-            month: 'long',
-            year: 'numeric',
-        })
-    } catch {
-        return 'неизвестно когда'
-    }
-}
-
-// Обработчики событий
-const removeMember = (member: IChatMember) => {
+const startRemoveMember = (member: IChatMember): void => {
     memberToRemove.value = member
-    showRemoveMemberDialog.value = true
+    showRemoveConfirm.value = true
 }
 
-const confirmRemoveMember = async () => {
+const confirmRemoveMember = async (): Promise<void> => {
     if (!memberToRemove.value || !props.chat) return
 
-    isRemovingMember.value = true
-    removingMembers.value.add(memberToRemove.value.user.id)
+    const userId =
+        typeof memberToRemove.value.user === 'string'
+            ? memberToRemove.value.user
+            : memberToRemove.value.user.id
+
+    removingMembers.value.add(userId)
+    showRemoveConfirm.value = false
 
     try {
-        await chatStore.removeMemberFromChat(props.chat.id, memberToRemove.value.user.id)
+        await chatStore.removeMemberFromChat(props.chat.id, userId)
 
-        // Обновляем локальное состояние чата
         const updatedChat = await chatStore.fetchChat(props.chat.id)
-        emit('chat-updated', updatedChat)
-
-        showRemoveMemberDialog.value = false
-        memberToRemove.value = null
+        if (updatedChat) {
+            emit('chat-updated', updatedChat)
+        }
 
         feedbackStore.showToast({
             type: 'success',
             title: 'Успешно',
             message: 'Участник удален из чата',
-            time: 3000,
         })
     } catch (error) {
         feedbackStore.showToast({
             type: 'error',
             title: 'Ошибка',
             message: 'Не удалось удалить участника',
-            time: 5000,
         })
     } finally {
-        isRemovingMember.value = false
-        removingMembers.value.delete(memberToRemove.value?.user.id || '')
+        removingMembers.value.delete(userId)
+        memberToRemove.value = null
     }
 }
 
-const makeAdmin = async (member: IChatMember) => {
-    // TODO: Реализовать назначение администратора когда API будет готово
-    feedbackStore.showToast({
-        type: 'info',
-        title: 'В разработке',
-        message: 'Функция назначения администратора будет добавлена позже',
-        time: 3000,
-    })
-}
-
-const removeInvite = async (invite: IChatInvite | IChatInvitation) => {
-    if (!invite.id) return
+const removeInvite = async (invite: IChatInvite | IChatInvitation): Promise<void> => {
+    if (!invite.id || !props.chat) return
 
     removingInvites.value.add(invite.id)
 
     try {
         await chatStore.removeInvitation(invite.id)
 
-        // Обновляем локальное состояние чата
-        if (props.chat) {
-            const updatedChat = await chatStore.fetchChat(props.chat.id)
+        const updatedChat = await chatStore.fetchChat(props.chat.id)
+        if (updatedChat) {
             emit('chat-updated', updatedChat)
         }
 
@@ -556,264 +504,264 @@ const removeInvite = async (invite: IChatInvite | IChatInvitation) => {
             type: 'success',
             title: 'Успешно',
             message: 'Приглашение отозвано',
-            time: 3000,
         })
     } catch (error) {
         feedbackStore.showToast({
             type: 'error',
             title: 'Ошибка',
             message: 'Не удалось отозвать приглашение',
-            time: 5000,
         })
     } finally {
         removingInvites.value.delete(invite.id)
     }
 }
 
-const handleInviteUsers = async (userIds: string[]) => {
+const handleInviteUsers = async (userIds: string[]): Promise<void> => {
     if (!props.chat) return
 
     try {
         await chatStore.addMembersToChat(props.chat.id, userIds)
 
-        // Обновляем локальное состояние чата
         const updatedChat = await chatStore.fetchChat(props.chat.id)
-        emit('chat-updated', updatedChat)
-
-        // Принудительно обновляем список глобальных приглашений
-        // чтобы новые приглашения сразу появились в интерфейсе
-        setTimeout(async () => {
-            try {
-                await chatStore.fetchInvitations()
-            } catch (error) {
-                console.warn('Не удалось обновить список приглашений:', error)
-            }
-        }, 500)
+        if (updatedChat) {
+            emit('chat-updated', updatedChat)
+        }
 
         showInviteDialog.value = false
-    } catch (error) {
-        // Ошибка обрабатывается в chatStore
-    }
-}
-
-const saveEditedInfo = async () => {
-    if (!props.chat || !hasInfoChanges.value) return
-
-    isSavingInfo.value = true
-
-    try {
-        const updatedChat = await chatStore.updateChat(props.chat.id, {
-            title: editedTitle.value.trim(),
-            description: editedDescription.value.trim(),
-        })
-
-        emit('chat-updated', updatedChat)
 
         feedbackStore.showToast({
             type: 'success',
-            title: 'Сохранено',
-            message: 'Информация о чате обновлена',
-            time: 3000,
-        })
-    } catch (error) {
-        // Ошибка обрабатывается в chatStore
-    } finally {
-        isSavingInfo.value = false
-    }
-}
-
-const resetEditedInfo = () => {
-    if (props.chat) {
-        editedTitle.value = props.chat.title
-        editedDescription.value = props.chat.description || ''
-    }
-}
-
-const deleteChat = async () => {
-    if (!props.chat) return
-
-    const confirmed = confirm(
-        `Вы действительно хотите удалить ${chatTypeLabel.value.toLowerCase()} "${props.chat.title}"? Это действие нельзя отменить.`,
-    )
-    if (!confirmed) return
-
-    try {
-        // TODO: Реализовать удаление чата когда API будет готово
-        feedbackStore.showToast({
-            type: 'info',
-            title: 'В разработке',
-            message: 'Функция удаления чата будет добавлена позже',
-            time: 3000,
+            title: 'Успешно',
+            message: 'Пользователи приглашены в чат',
         })
     } catch (error) {
         feedbackStore.showToast({
             type: 'error',
             title: 'Ошибка',
-            message: 'Не удалось удалить чат',
-            time: 5000,
+            message: 'Не удалось пригласить пользователей',
         })
     }
 }
 
-// Наблюдатели
+// Computed свойства для настроек
+const hasChanges = computed(() => {
+    return (
+        editedTitle.value !== (props.chat?.title || '') ||
+        editedDescription.value !== (props.chat?.description || '') ||
+        currentAvatar.value !== (props.chat?.icon || '')
+    )
+})
+
+// Методы для работы с настройками
+const initializeSettings = () => {
+    editedTitle.value = props.chat?.title || ''
+    editedDescription.value = props.chat?.description || ''
+    currentAvatar.value = props.chat?.icon || ''
+}
+
+const saveSettings = async () => {
+    if (!props.chat || !hasChanges.value) return
+
+    isSavingSettings.value = true
+    try {
+        // Здесь должен быть вызов API для обновления чата
+        // const updatedChat = await chatStore.updateChat(props.chat.id, {
+        //     title: editedTitle.value,
+        //     description: editedDescription.value
+        // })
+
+        feedbackStore.showToast({
+            type: 'success',
+            title: 'Настройки сохранены',
+            message: 'Настройки чата успешно обновлены',
+        })
+
+        // emit('chat-updated', updatedChat)
+    } catch (error) {
+        feedbackStore.showToast({
+            type: 'error',
+            title: 'Ошибка',
+            message: 'Не удалось сохранить настройки',
+        })
+    } finally {
+        isSavingSettings.value = false
+    }
+}
+
+// Методы для работы с аватаркой
+const getChatInitials = (): string => {
+    if (!props.chat?.title) return 'ЧТ'
+    return props.chat.title
+        .split(' ')
+        .slice(0, 2)
+        .map((word) => word.charAt(0).toUpperCase())
+        .join('')
+}
+
+const onAvatarSelect = (event: any) => {
+    const file = event.files[0]
+    if (file) {
+        // Создаем превью изображения
+        const reader = new FileReader()
+        reader.onload = (e) => {
+            currentAvatar.value = e.target?.result as string
+        }
+        reader.readAsDataURL(file)
+    }
+}
+
+const onAvatarUpload = (event: any) => {
+    // Здесь будет логика загрузки на сервер
+    console.log('Avatar upload:', event)
+    feedbackStore.showToast({
+        type: 'info',
+        title: 'Загрузка аватарки',
+        message: 'Функция загрузки будет реализована позже',
+    })
+}
+
+const removeAvatar = () => {
+    currentAvatar.value = ''
+}
+
+// Методы для работы с приглашениями
+const recallAllInvites = async () => {
+    if (!props.chat || chatInvitations.value.length === 0) return
+
+    isRecallingAllInvites.value = true
+    try {
+        // Отзываем все приглашения параллельно
+        const promises = chatInvitations.value.map((invite) =>
+            membersStore.removeInvitation(invite.id),
+        )
+
+        await Promise.all(promises)
+
+        feedbackStore.showToast({
+            type: 'success',
+            title: 'Приглашения отозваны',
+            message: 'Все приглашения успешно отозваны',
+        })
+    } catch (error) {
+        feedbackStore.showToast({
+            type: 'error',
+            title: 'Ошибка',
+            message: 'Не удалось отозвать приглашения',
+        })
+    } finally {
+        isRecallingAllInvites.value = false
+    }
+}
+
+const debugInvitations = async () => {
+    console.log('=== DEBUG INVITATIONS START ===')
+
+    // Информация о текущем пользователе
+    const userStore = useUserStore()
+    const currentUser = userStore.user
+    console.log('Current user:', {
+        user: currentUser,
+        uuid: currentUser?.uuid,
+        id: currentUser?.id,
+    })
+
+    // Прямой вызов API
+    try {
+        console.log('Making direct API call...')
+        const result = await inviteApiService.fetchInvitations()
+        console.log('Direct API result:', result)
+
+        const sentResult = await inviteApiService.fetchSentInvitations()
+        console.log('Direct sent API result:', sentResult)
+    } catch (error) {
+        console.error('Direct API error:', error)
+    }
+
+    // Состояние сторов
+    console.log('MembersStore state:', {
+        invitations: membersStore.invitations,
+        sentInvitations: membersStore.sentInvitations,
+        isInvitationsInitialized: membersStore.isInvitationsInitialized,
+        isSentInvitationsInitialized: membersStore.isSentInvitationsInitialized,
+    })
+
+    // Состояние компонента
+    console.log('Component state:', {
+        chatId: props.chat?.id,
+        chatInvitations: chatInvitations.value,
+        canManageChat: canManageChat.value,
+    })
+
+    console.log('=== DEBUG INVITATIONS END ===')
+}
+
+// Методы для информационного таба (оставляем для совместимости)
+const getCreatorName = (): string => {
+    if (!props.chat?.created_by) return 'Неизвестно'
+
+    const creator = props.chat.created_by
+    if (typeof creator === 'string') return creator
+
+    const { first_name, last_name, middle_name } = creator
+    return [first_name, middle_name, last_name].filter(Boolean).join(' ') || 'Пользователь'
+}
+
+const getCreatorInitials = (): string => {
+    const name = getCreatorName()
+    return name
+        .split(' ')
+        .slice(0, 2)
+        .map((word) => word.charAt(0).toUpperCase())
+        .join('')
+}
+
+// Инициализация при открытии диалога
 watch(
     () => props.visible,
-    (visible) => {
-        if (visible && props.chat) {
-            // Инициализируем поля редактирования при открытии
-            editedTitle.value = props.chat.title
-            editedDescription.value = props.chat.description || ''
-            activeTab.value = 'members'
-            membersSearchQuery.value = ''
+    async (visible) => {
+        if (visible) {
+            initializeSettings()
+            // Загружаем приглашения при открытии модалки
+            console.log('[ChatMembersManagement] Refreshing invitations on modal open')
+            await Promise.all([
+                membersStore.refreshInvitations(),
+                membersStore.refreshSentInvitations(),
+            ])
+
+            // Также обновляем информацию о чате
+            if (props.chat?.id) {
+                console.log('[ChatMembersManagement] Fetching fresh chat data')
+                const updatedChat = await chatStore.fetchChat(props.chat.id)
+                if (updatedChat) {
+                    console.log('[ChatMembersManagement] Updated chat data:', updatedChat)
+                }
+            }
         }
     },
 )
 
+// Обновление данных при изменении чата (реалтайм обновления)
 watch(
     () => props.chat,
     (newChat) => {
-        if (newChat) {
-            editedTitle.value = newChat.title
-            editedDescription.value = newChat.description || ''
+        if (newChat && props.visible) {
+            initializeSettings()
         }
     },
+    { deep: true },
 )
 </script>
 
 <style scoped>
-.chat-icon {
-    width: 48px;
-    height: 48px;
-    border-radius: 8px;
-    object-fit: cover;
-    flex-shrink: 0;
-}
-
-.chat-icon-initials {
-    width: 48px;
-    height: 48px;
-    border-radius: 8px;
-    background: var(--p-primary-color);
-    color: white;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 18px;
-    font-weight: 600;
-    flex-shrink: 0;
-}
-
-.member-avatar {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background-color: var(--p-surface-200);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--p-surface-600);
-    flex-shrink: 0;
-}
-
-.admin-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    background: var(--p-primary-100);
-    color: var(--p-primary-700);
-    font-size: 11px;
-    padding: 2px 6px;
-    border-radius: 12px;
-    font-weight: 500;
-    margin-left: 8px;
-}
-
-.invite-item:hover {
-    background: var(--p-surface-100);
+.space-y-2 > * + * {
+    margin-top: 0.5rem;
 }
 
 .space-y-4 > * + * {
     margin-top: 1rem;
 }
 
-.space-y-3 > * + * {
-    margin-top: 0.75rem;
-}
-
-.setting-group {
-    padding-bottom: 1rem;
-}
-
-.setting-group:not(:last-child) {
-    border-bottom: 1px solid var(--p-surface-200);
-    margin-bottom: 1rem;
-}
-
-/* Улучшенные стили для вкладок */
-.flex.border-b button {
-    position: relative;
-    transition: all 0.2s ease;
-}
-
-.flex.border-b button:hover {
-    background: var(--p-surface-50);
-}
-
-/* Стили для темной темы */
-.app-dark .member-avatar {
-    background-color: var(--p-surface-700);
-    color: var(--p-surface-300);
-}
-
-.app-dark .admin-badge {
-    background: var(--p-primary-900);
-    color: var(--p-primary-100);
-}
-
-.app-dark .member-item:hover,
-.app-dark .invite-item:hover {
-    background: var(--p-surface-800);
-}
-
-/* Адаптивные стили */
-@media (max-width: 768px) {
-    .member-item,
-    .invite-item {
-        padding: 1rem;
-    }
-
-    .chat-icon,
-    .chat-icon-initials {
-        width: 40px;
-        height: 40px;
-        font-size: 16px;
-    }
-
-    .member-avatar {
-        width: 36px;
-        height: 36px;
-    }
-}
-
-/* Кастомный скроллбар */
-.members-list::-webkit-scrollbar,
-.invites-list::-webkit-scrollbar {
-    width: 6px;
-}
-
-.members-list::-webkit-scrollbar-track,
-.invites-list::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-.members-list::-webkit-scrollbar-thumb,
-.invites-list::-webkit-scrollbar-thumb {
-    background-color: var(--p-surface-300);
-    border-radius: 3px;
-}
-
-.app-dark .members-list::-webkit-scrollbar-thumb,
-.app-dark .invites-list::-webkit-scrollbar-thumb {
-    background-color: var(--p-surface-600);
+.space-y-6 > * + * {
+    margin-top: 1.5rem;
 }
 </style>

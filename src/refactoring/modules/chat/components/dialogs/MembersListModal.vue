@@ -12,16 +12,14 @@
         <div class="members-container">
             <!-- Заголовок со счетчиком -->
             <div class="members-header mb-4">
-                <h3 class="text-lg font-semibold">
-                    Участники {{ chatTypeLabel.toLowerCase() }}
-                </h3>
-                <p class="text-sm text-surface-500">
-                    Всего участников: {{ totalMembers }}
-                </p>
+                <h3 class="text-lg font-semibold">Участники {{ chatTypeLabel.toLowerCase() }}</h3>
+                <p class="text-sm text-surface-500">Всего участников: {{ totalMembers }}</p>
             </div>
 
             <!-- Список участников с внутренним скроллом -->
-            <div class="members-list max-h-96 overflow-y-auto border border-surface-200 dark:border-surface-700 rounded-lg">
+            <div
+                class="members-list max-h-96 overflow-y-auto border border-surface-200 dark:border-surface-700 rounded-lg"
+            >
                 <div
                     v-for="member in members"
                     :key="member.user.id"
@@ -31,7 +29,7 @@
                     <div class="flex items-center gap-3 flex-1 min-w-0">
                         <!-- Аватарка -->
                         <div class="member-avatar">
-                            <img 
+                            <img
                                 v-if="getMemberAvatar(member)"
                                 :src="getMemberAvatar(member) || undefined"
                                 :alt="getMemberDisplayName(member)"
@@ -53,14 +51,20 @@
                                     Admin
                                 </span>
                             </div>
-                            
+
                             <!-- Должность -->
-                            <p v-if="getMemberPosition(member)" class="text-sm text-surface-600 dark:text-surface-400 truncate">
+                            <p
+                                v-if="getMemberPosition(member)"
+                                class="text-sm text-surface-600 dark:text-surface-400 truncate"
+                            >
                                 {{ getMemberPosition(member) }}
                             </p>
-                            
+
                             <!-- Подразделение -->
-                            <p v-if="getMemberDepartment(member)" class="text-xs text-surface-500 truncate">
+                            <p
+                                v-if="getMemberDepartment(member)"
+                                class="text-xs text-surface-500 truncate"
+                            >
                                 {{ getMemberDepartment(member) }}
                             </p>
                         </div>
@@ -81,10 +85,7 @@
                 </div>
 
                 <!-- Пустое состояние -->
-                <div
-                    v-if="members.length === 0"
-                    class="text-center py-8 text-surface-500"
-                >
+                <div v-if="members.length === 0" class="text-center py-8 text-surface-500">
                     <i class="pi pi-users text-4xl mb-4 block"></i>
                     <div>Участники не найдены</div>
                 </div>
@@ -245,7 +246,7 @@ const isCurrentUser = (member: IChatMember): boolean => {
 
 const getRemoveButtonText = (): string => {
     if (!props.chat) return 'Исключить'
-    
+
     switch (props.chat.type) {
         case 'group':
             return 'Исключить из группы'
@@ -266,10 +267,14 @@ const confirmRemoveMember = async () => {
     if (!memberToRemove.value || !props.chat) return
 
     isRemovingMember.value = true
-    removingMembers.value.add(memberToRemove.value.user.id)
+    const userId =
+        typeof memberToRemove.value.user === 'string'
+            ? memberToRemove.value.user
+            : memberToRemove.value.user.id
+    removingMembers.value.add(userId)
 
     try {
-        await chatStore.removeMemberFromChat(props.chat.id, memberToRemove.value.user.id)
+        await chatStore.removeMemberFromChat(props.chat.id, userId)
 
         showRemoveConfirm.value = false
         emit('member-removed', memberToRemove.value)

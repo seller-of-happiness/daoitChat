@@ -1,7 +1,12 @@
 <template>
     <div class="invitation-item">
         <!-- Иконка чата -->
-        <img v-if="invitation.chat.icon" :src="withBase(invitation.chat.icon)" alt="icon" class="chat-icon" />
+        <img
+            v-if="invitation.chat.icon"
+            :src="withBase(invitation.chat.icon)"
+            alt="icon"
+            class="chat-icon"
+        />
         <div v-else class="chat-icon-initials">
             {{ chatInitials }}
         </div>
@@ -11,7 +16,8 @@
             <div class="invitation-title">{{ invitation.chat.title }}</div>
             <div class="invitation-sub">
                 <span class="invitation-message">
-                    {{ stripHtmlTags(invitation.created_by.first_name) }} {{ stripHtmlTags(invitation.created_by.last_name) }} приглашает вас
+                    {{ stripHtmlTags(invitation.created_by.first_name) }}
+                    {{ stripHtmlTags(invitation.created_by.last_name) }} приглашает вас
                 </span>
             </div>
         </div>
@@ -47,6 +53,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { generateChatInitials, withBase } from '@/refactoring/modules/chat/utils/chatHelpers'
+import { stripHtmlTags } from '@/refactoring/utils/formatters'
 import type { IChatInvitation } from '@/refactoring/modules/chat/types/IChat'
 
 interface Props {
@@ -68,11 +75,11 @@ const handleAccept = async () => {
     if (isProcessing.value || !props.invitation.id) {
         console.warn('[InvitationListItem] handleAccept: кнопка заблокирована или нет ID', {
             isProcessing: isProcessing.value,
-            invitationId: props.invitation.id
+            invitationId: props.invitation.id,
         })
         return
     }
-    
+
     console.log('[InvitationListItem] handleAccept: принимаем приглашение', props.invitation.id)
     isProcessing.value = true
     try {
@@ -87,11 +94,11 @@ const handleDecline = async () => {
     if (isProcessing.value || !props.invitation.id) {
         console.warn('[InvitationListItem] handleDecline: кнопка заблокирована или нет ID', {
             isProcessing: isProcessing.value,
-            invitationId: props.invitation.id
+            invitationId: props.invitation.id,
         })
         return
     }
-    
+
     console.log('[InvitationListItem] handleDecline: отклоняем приглашение', props.invitation.id)
     isProcessing.value = true
     try {
@@ -100,14 +107,6 @@ const handleDecline = async () => {
         // Не сбрасываем флаг сразу, так как приглашение должно исчезнуть из списка
         // isProcessing.value = false
     }
-}
-
-/**
- * Очищает HTML теги из строки, оставляя только текст
- */
-const stripHtmlTags = (str: string): string => {
-    if (!str) return str
-    return str.replace(/<[^>]*>/g, '')
 }
 
 // Получение инициалов для иконки

@@ -233,7 +233,7 @@ export function useChatLogic(options: ChatLogicOptions = {}) {
         try {
             const invitationId =
                 typeof invitationOrId === 'number' ? invitationOrId : invitationOrId.id
-            if (!invitationId || invitationId <= 0) {
+            if (invitationId === null || invitationId === undefined || invitationId <= 0) {
                 console.error(
                     '[useChatLogic] acceptInvitation: недействительный invitationId',
                     invitationOrId,
@@ -261,7 +261,7 @@ export function useChatLogic(options: ChatLogicOptions = {}) {
         try {
             const invitationId =
                 typeof invitationOrId === 'number' ? invitationOrId : invitationOrId.id
-            if (!invitationId || invitationId <= 0) {
+            if (invitationId === null || invitationId === undefined || invitationId <= 0) {
                 console.error(
                     '[useChatLogic] declineInvitation: недействительный invitationId',
                     invitationOrId,

@@ -1,13 +1,12 @@
 <template>
     <div class="flex gap-4 h-[calc(100vh-8rem)] flex-wrap md:flex-nowrap relative overflow-hidden">
-        <!-- Боковая панель -->
         <ChatSidebar
             :chats="chatStore.chats"
             :current-chat-id="chatStore.currentChat?.id || null"
             :search-results="chatStore.searchResults"
             :is-searching="chatStore.isSearching"
             :is-loading-chats="chatStore.isLoadingChats"
-            :invitations="chatStore.invitations"
+            :invitations="membersStore.invitations"
             :mobile-class="mobileAsideClass"
             @select-chat="openChatFromList"
             @create-chat="showCreate = true"
@@ -18,9 +17,7 @@
             @decline-invitation="declineInvitation"
         />
 
-        <!-- Основная область чата -->
         <section class="w-full card p-0 flex flex-col overflow-hidden" :class="mobileChatClass">
-            <!-- Заголовок чата -->
             <ChatHeader
                 :current-chat="chatStore.currentChat"
                 :is-mobile="isMobile"
@@ -29,22 +26,17 @@
                 @invite-users="showInviteDialog = true"
                 @manage-chat="showManageDialog = true"
                 @show-members="showMembersDialog = true"
-                @debug-websocket="debugWebSocket"
             />
 
-            <!-- Область сообщений -->
             <div
                 id="chat-messages"
                 ref="messagesContainer"
                 class="flex-1 overflow-y-auto py-4 px-10 bg-surface-50 dark:bg-surface-900/40 flex flex-col gap-1"
             >
                 <template v-if="chatStore.currentChat">
-                    <!-- Показываем скелетоны во время загрузки -->
                     <template v-if="chatStore.isLoadingMessages">
                         <MessagesSkeletonGroup :count="6" />
                     </template>
-                    
-                    <!-- Показываем реальные сообщения после загрузки -->
                     <template v-else>
                         <template v-for="group in groupedMessages" :key="group.key">
                             <div class="text-center text-sm text-surface-500 my-2 select-none">
@@ -73,7 +65,6 @@
                 </template>
             </div>
 
-            <!-- Область ввода -->
             <ChatInput
                 :current-chat="chatStore.currentChat"
                 :is-sending="chatStore.isSending"
@@ -81,283 +72,437 @@
             />
         </section>
 
-        <!-- Диалог создания чата -->
         <ChatCreateDialog v-model:visible="showCreate" @create="createChat" />
-
-        <!-- Диалог приглашения пользователей -->
         <InviteUsersDialog
             v-model:visible="showInviteDialog"
             :chat="chatStore.currentChat"
             @invite-users="inviteUsers"
         />
-
-        <!-- Диалог управления чатом -->
         <ChatMembersManagement
             v-model:visible="showManageDialog"
             :chat="chatStore.currentChat"
             @chat-updated="onChatUpdated"
         />
-
-        <!-- Модальное окно со списком участников -->
-        <MembersListModal
-            v-model:visible="showMembersDialog"
-            :chat="chatStore.currentChat"
-            @member-removed="onMemberRemoved"
-        />
-
-        <!-- Баннер активации звука (как в Битрикс24/Telegram) -->
-        <SoundActivationBanner />
+        <MembersListModal v-model:visible="showMembersDialog" :chat="chatStore.currentChat" />
     </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { useChatLogic } from '@/refactoring/modules/chat/composables/useChatLogic'
-import { usePhotoSwipe } from '@/refactoring/modules/chat/composables/usePhotoSwipe'
+import { computed, onMounted, onUnmounted, ref, shallowRef, watch, nextTick } from 'vue'
+import { useChatStore } from '@/refactoring/modules/chat/stores/chatStore'
+import { useMembersStore } from '@/refactoring/modules/chat/stores/membersStore'
+import { useRealtimeStore } from '@/refactoring/modules/chat/stores/realtimeStore'
+import { useCurrentUser } from '@/refactoring/modules/chat/composables/useCurrentUser'
 import { useFeedbackStore } from '@/refactoring/modules/feedback/stores/feedbackStore'
-import 'photoswipe/style.css'
+import { formatDateOnly } from '@/refactoring/utils/formatters'
 
 import ChatSidebar from './ChatSidebar.vue'
 import ChatHeader from './ChatHeader.vue'
 import ChatInput from './ChatInput.vue'
 import MessageItem from '../messages/MessageItem.vue'
-import MessagesSkeletonGroup from '../common/skeletons/MessagesSkeletonGroup.vue'
 import ChatCreateDialog from '../dialogs/ChatCreateDialog.vue'
 import InviteUsersDialog from '../dialogs/InviteUsersDialog.vue'
 import ChatMembersManagement from '../dialogs/ChatMembersManagement.vue'
 import MembersListModal from '../dialogs/MembersListModal.vue'
-import SoundActivationBanner from '../features/sound/SoundActivationBanner.vue'
+import { MessagesSkeletonGroup } from '../common/skeletons'
 
-import type { IChat } from '@/refactoring/modules/chat/types/IChat'
+import type {
+    IChat,
+    IMessage,
+    IChatMember,
+    IEmployee,
+} from '@/refactoring/modules/chat/types/IChat'
 
 interface Props {
     userId?: string
+    initialChatId?: number | null
+    initialUserId?: string | null
 }
 
 const props = defineProps<Props>()
 
-// Инициализация композабла с общей логикой чата
-const chatLogic = useChatLogic({
-    userId: props.userId,
-    messagesContainerSelector: '#chat-messages',
-})
+const chatStore = useChatStore()
+const membersStore = useMembersStore()
+const realtimeStore = useRealtimeStore()
+const currentUser = useCurrentUser()
+const fb = useFeedbackStore()
 
-// Инициализация галереи изображений
-usePhotoSwipe({
-    gallery: '#chat-messages',
-    children: 'a.attachment-image-link, .attachments-only .img-wrap',
-})
+const messagesContainer = shallowRef<HTMLElement | null>(null)
+const autoScroll = ref(true)
+const isMobile = ref(false)
+const mobileView = ref<'list' | 'chat'>('list')
 
-// Состояние компонента
 const showCreate = ref(false)
 const showInviteDialog = ref(false)
 const showManageDialog = ref(false)
 const showMembersDialog = ref(false)
 
-// Извлекаем нужные переменные из композабла
-const {
-    chatStore,
-    currentUser,
-    messagesContainer,
-    isMobile,
-    mobileView,
-    groupedMessages,
-    scrollToBottom,
-    openChatFromList,
-    performSearch,
-    clearSearch,
-    createNewDialog,
-    sendMessage,
-    createChat: createChatBase,
-    inviteUsersToChat,
-    changeReaction,
-    removeMyReaction,
-    acceptInvitation,
-    declineInvitation,
-    initialize,
-    cleanup,
-} = chatLogic
+let mediaQueryList: MediaQueryList | null = null
+
+const BOTTOM_THRESHOLD_PX = 32
+
+const updateIsMobile = () => {
+    if (mediaQueryList) {
+        isMobile.value = mediaQueryList.matches
+    }
+}
+
+const isNearBottom = (): boolean => {
+    const container = messagesContainer.value
+    if (!container) return false
+    const { scrollTop, scrollHeight, clientHeight } = container
+    return scrollHeight - scrollTop - clientHeight < BOTTOM_THRESHOLD_PX
+}
+
+const scrollToBottom = (smooth = false): void => {
+    nextTick(() => {
+        const container = messagesContainer.value
+        if (!container) return
+        container.scrollTo({
+            top: container.scrollHeight,
+            behavior: smooth ? 'smooth' : 'auto',
+        })
+    })
+}
+
+const handleScroll = (): void => {
+    autoScroll.value = isNearBottom()
+}
+
+const checkAndAutoScroll = (): void => {
+    if (autoScroll.value) {
+        scrollToBottom()
+    }
+}
 
 const mobileAsideClass = computed(() =>
-    isMobile.value
-        ? [
-              'absolute',
-              'inset-0',
-              'z-10',
-              'transform',
-              'transition-transform',
-              'duration-300',
-              mobileView.value === 'list' ? 'translate-x-0' : '-translate-x-full',
-          ]
-        : [],
+    isMobile.value ? (mobileView.value === 'list' ? 'block' : 'hidden') : '',
 )
 
 const mobileChatClass = computed(() =>
-    isMobile.value
-        ? [
-              'absolute',
-              'inset-0',
-              'z-20',
-              'transform',
-              'transition-transform',
-              'duration-300',
-              mobileView.value === 'chat' ? 'translate-x-0' : 'translate-x-full',
-          ]
-        : [],
+    isMobile.value ? (mobileView.value === 'chat' ? 'block' : 'hidden') : '',
 )
 
-const createChat = async (payload: {
-    type: 'group' | 'channel'
-    title: string
-    description: string
-    icon: File | null
-    addMembersImmediately: boolean
-    selectedUsers: Array<{
-        id: string
-        full_name: string
-        position: string | null
-        department: { id: string; name: string } | null
-    }>
-}) => {
-    try {
-        const result = await createChatBase(payload)
-        showCreate.value = false
+const groupedMessages = computed(() => {
+    if (!chatStore.messages.length) return []
 
-        // Если есть выбранные пользователи, приглашаем их сразу после создания чата
-        if (payload.addMembersImmediately && payload.selectedUsers.length > 0) {
-            // Небольшая задержка чтобы чат успел загрузиться
-            setTimeout(async () => {
-                const userIds = payload.selectedUsers.map(user => user.id)
-                await inviteUsersToChat(userIds)
-            }, 300)
-        } else if (payload.addMembersImmediately) {
-            // Если включена опция, но пользователи не выбраны, открываем диалог приглашения
-            setTimeout(() => {
-                showInviteDialog.value = true
-            }, 300)
-        }
-    } catch (error) {
-        // Ошибка обрабатывается в композабле
-    }
-}
+    const groups: Record<string, IMessage[]> = {}
 
-// Transform chat members to the format expected by MessageItem
-const transformedChatMembers = computed(() => {
-    if (!chatStore.currentChat?.members) return []
-    
-    return chatStore.currentChat.members.map(member => ({
-        user: typeof member.user === 'string' ? member.user : member.user.id,
-        user_name: typeof member.user === 'string' ? member.user_name || '' : `${member.user.first_name} ${member.user.last_name}`.trim(),
-        user_uuid: member.user_uuid,
+    chatStore.messages.forEach((message) => {
+        const date = formatDateOnly(message.created_at)
+        if (!groups[date]) groups[date] = []
+        groups[date].push(message)
+    })
+
+    return Object.entries(groups).map(([date, messages]) => ({
+        key: date,
+        label: date,
+        items: messages,
     }))
 })
 
-const inviteUsers = async (userIds: string[]) => {
-    await inviteUsersToChat(userIds)
-    showInviteDialog.value = false
-}
+const transformedChatMembers = computed(() => {
+    if (!chatStore.currentChat?.members) return []
 
-// Диагностика WebSocket соединения
-const debugWebSocket = () => {
-    console.log('=== ДИАГНОСТИКА WEBSOCKET ===')
-    
-    const connectionStatus = chatStore.checkWebSocketConnection()
-    console.log('Состояние соединения:', connectionStatus)
-    
-    // Показываем в интерфейсе тоже
-    const fb = useFeedbackStore()
-    
-    if (!connectionStatus.connected) {
+    return chatStore.currentChat.members.map((member) => ({
+        user: member.user,
+        is_admin: member.is_admin,
+        joined_at: member.joined_at,
+        user_uuid: member.user_uuid || '',
+        user_name:
+            typeof member.user === 'string'
+                ? member.user_name || ''
+                : `${member.user?.first_name || ''} ${member.user?.last_name || ''}`.trim(),
+    }))
+})
+
+const openChatFromList = async (chat: IChat): Promise<void> => {
+    try {
+        await chatStore.openChat(chat)
+        mobileView.value = 'chat'
+        scrollToBottom()
+    } catch (error) {
         fb.showToast({
-            type: 'warning',
-            title: 'WebSocket не подключен',
-            message: `Статус: ${connectionStatus.connecting ? 'подключается' : 'отключен'}. Попробовать переподключение?`,
-            time: 10000,
-        })
-        
-        // Предлагаем переподключиться
-        setTimeout(async () => {
-            try {
-                await chatStore.reconnectToWebSocket()
-            } catch (error) {
-                console.error('Ошибка переподключения:', error)
-            }
-        }, 2000)
-    } else {
-        fb.showToast({
-            type: 'info',
-            title: 'WebSocket диагностика',
-            message: `Подключен к ${connectionStatus.subscriptions.length} каналам. Подписан на пользовательский канал: ${connectionStatus.subscribedToUserChannel ? 'Да' : 'Нет'}`,
-            time: 5000,
+            type: 'error',
+            title: 'Ошибка',
+            message: 'Не удалось открыть чат',
         })
     }
 }
 
-const onChatUpdated = (updatedChat: IChat) => {
-    // Обновляем текущий чат в сторе
+const createNewDialog = async (employee: IEmployee): Promise<void> => {
+    try {
+        const chat = await chatStore.createDialog(employee.id)
+        await chatStore.openChat(chat)
+        mobileView.value = 'chat'
+    } catch (error) {
+        fb.showToast({
+            type: 'error',
+            title: 'Ошибка',
+            message: 'Не удалось создать диалог',
+        })
+    }
+}
+
+const sendMessage = async (content: string): Promise<void> => {
+    if (!chatStore.currentChat) return
+
+    try {
+        await chatStore.sendMessage(chatStore.currentChat.id, content)
+        checkAndAutoScroll()
+    } catch (error) {
+        fb.showToast({
+            type: 'error',
+            title: 'Ошибка',
+            message: 'Не удалось отправить сообщение',
+        })
+    }
+}
+
+const createChat = async (payload: any): Promise<void> => {
+    try {
+        const chat = await chatStore.createChat(payload)
+        await chatStore.openChat(chat)
+        showCreate.value = false
+    } catch (error) {
+        fb.showToast({
+            type: 'error',
+            title: 'Ошибка',
+            message: 'Не удалось создать чат',
+        })
+    }
+}
+
+const inviteUsers = async (payload: { selectedUsers: IEmployee[] }): Promise<void> => {
+    if (!chatStore.currentChat) return
+
+    try {
+        const userIds = payload.selectedUsers.map((user) => user.id)
+        await chatStore.addMembersToChat(chatStore.currentChat.id, userIds)
+        showInviteDialog.value = false
+
+        fb.showToast({
+            type: 'success',
+            title: 'Успех',
+            message: 'Пользователи приглашены',
+        })
+    } catch (error) {
+        fb.showToast({
+            type: 'error',
+            title: 'Ошибка',
+            message: 'Не удалось пригласить пользователей',
+        })
+    }
+}
+
+const performSearch = async (query: string): Promise<void> => {
+    try {
+        await chatStore.searchChats(query)
+    } catch (error) {
+        fb.showToast({
+            type: 'error',
+            title: 'Ошибка поиска',
+            message: 'Не удалось выполнить поиск',
+        })
+    }
+}
+
+const clearSearch = (): void => {
+    chatStore.searchResults = []
+    chatStore.isSearching = false
+}
+
+const acceptInvitation = async (invitation: any): Promise<void> => {
+    try {
+        const success = await membersStore.acceptInvitation(invitation.id)
+        if (success) {
+            // Refresh chats list to include the new chat
+            await chatStore.fetchChats()
+            fb.showToast({
+                type: 'success',
+                title: 'Приглашение принято',
+                message: 'Вы присоединились к чату',
+            })
+        }
+    } catch (error) {
+        fb.showToast({
+            type: 'error',
+            title: 'Ошибка',
+            message: 'Не удалось принять приглашение',
+        })
+    }
+}
+
+const declineInvitation = async (invitation: any): Promise<void> => {
+    try {
+        const success = await membersStore.declineInvitation(invitation.id)
+        if (success) {
+            fb.showToast({
+                type: 'info',
+                title: 'Приглашение отклонено',
+                message: 'Приглашение отклонено',
+            })
+        }
+    } catch (error) {
+        fb.showToast({
+            type: 'error',
+            title: 'Ошибка',
+            message: 'Не удалось отклонить приглашение',
+        })
+    }
+}
+
+const changeReaction = async (messageId: number, reactionId: number): Promise<void> => {
+    try {
+        await chatStore.addReaction(messageId, reactionId)
+    } catch (error) {
+        fb.showToast({
+            type: 'error',
+            title: 'Ошибка',
+            message: 'Не удалось добавить реакцию',
+        })
+    }
+}
+
+const removeMyReaction = async (messageId: number): Promise<void> => {
+    try {
+        await chatStore.clearMyReactions(messageId)
+    } catch (error) {
+        fb.showToast({
+            type: 'error',
+            title: 'Ошибка',
+            message: 'Не удалось удалить реакцию',
+        })
+    }
+}
+
+const editMessage = async (messageId: number): Promise<void> => {
+    if (!chatStore.currentChat) return
+
+    try {
+        const message = chatStore.messages.find((m) => m.id === messageId)
+        if (!message) return
+
+        const newContent = prompt('Редактировать сообщение:', message.content)
+        if (newContent === null || newContent.trim() === '') return
+
+        await chatStore.updateMessage(chatStore.currentChat.id, messageId, newContent.trim())
+    } catch (error) {
+        fb.showToast({
+            type: 'error',
+            title: 'Ошибка',
+            message: 'Не удалось отредактировать сообщение',
+        })
+    }
+}
+
+const deleteMessage = async (messageId: number): Promise<void> => {
+    if (!chatStore.currentChat) return
+
+    try {
+        const confirmed = confirm('Вы уверены, что хотите удалить это сообщение?')
+        if (!confirmed) return
+
+        await chatStore.deleteMessage(chatStore.currentChat.id, messageId)
+    } catch (error) {
+        fb.showToast({
+            type: 'error',
+            title: 'Ошибка',
+            message: 'Не удалось удалить сообщение',
+        })
+    }
+}
+
+const onChatUpdated = (updatedChat: IChat): void => {
     if (chatStore.currentChat?.id === updatedChat.id) {
         chatStore.currentChat = updatedChat
     }
-
-    // Обновляем чат в списке чатов
-    const chatIndex = chatStore.chats.findIndex((chat) => chat.id === updatedChat.id)
-    if (chatIndex !== -1) {
-        chatStore.chats.splice(chatIndex, 1, updatedChat)
-    }
 }
 
-const onMemberRemoved = async () => {
-    // Обновляем данные чата после удаления участника
-    if (chatStore.currentChat) {
-        try {
-            const updatedChat = await chatStore.fetchChat(chatStore.currentChat.id)
-            onChatUpdated(updatedChat)
-        } catch (error) {
-        }
-    }
-}
-
-// Обработчики для редактирования и удаления сообщений
-const editMessage = async (messageId: number) => {
-    if (!chatStore.currentChat) return
-    
-    try {
-        // Находим сообщение для редактирования
-        const message = chatStore.messages.find(m => m.id === messageId)
-        if (!message) return
-        
-        // Показываем prompt для редактирования
-        const newContent = prompt('Редактировать сообщение:', message.content)
-        if (newContent === null || newContent.trim() === '') return
-        
-        // Обновляем сообщение через store
-        await chatStore.updateMessage(chatStore.currentChat.id, messageId, newContent.trim())
-    } catch (error) {
-        // Ошибка обрабатывается в store
-    }
-}
-
-const deleteMessage = async (messageId: number) => {
-    if (!chatStore.currentChat) return
-    
-    try {
-        // Подтверждение удаления
-        const confirmed = confirm('Вы уверены, что хотите удалить это сообщение?')
-        if (!confirmed) return
-        
-        // Удаляем сообщение через store
-        await chatStore.deleteMessage(chatStore.currentChat.id, messageId)
-    } catch (error) {
-        // Ошибка обрабатывается в store
-    }
-}
-
-// Хуки жизненного цикла
 onMounted(async () => {
-    await initialize()
+    try {
+        // Initialize chat data and real-time connections
+        await Promise.all([
+            chatStore.initializeOnce(),
+            membersStore.fetchInvitations(),
+            realtimeStore.initialize(),
+        ])
+
+        if (props.userId) {
+            const chat = await chatStore.createDialog(props.userId)
+            await chatStore.openChat(chat)
+            mobileView.value = 'chat'
+        } else if (props.initialChatId) {
+            await chatStore.openChatById(props.initialChatId)
+            mobileView.value = 'chat'
+        } else {
+            // Попытка восстановить последний выбранный чат из localStorage
+            try {
+                const savedId = Number(localStorage.getItem('selectedChatId') || '')
+                if (savedId && !Number.isNaN(savedId)) {
+                    // Сначала проверяем есть ли чат в загруженном списке
+                    const savedChat = chatStore.chats.find((c) => c.id === savedId)
+                    if (savedChat) {
+                        await chatStore.openChat(savedChat)
+                        mobileView.value = 'chat'
+                    } else {
+                        // Если чат не найден в списке, попробуем открыть по ID
+                        try {
+                            await chatStore.openChatById(savedId)
+                            mobileView.value = 'chat'
+                        } catch (error) {
+                            // Не удалось открыть сохраненный чат, очищаем localStorage
+                            localStorage.removeItem('selectedChatId')
+                        }
+                    }
+                }
+            } catch (e) {
+                // Игнорируем ошибки localStorage
+            }
+        }
+
+        if (window.matchMedia) {
+            mediaQueryList = window.matchMedia('(max-width: 768px)')
+            updateIsMobile()
+            mediaQueryList.addEventListener('change', updateIsMobile)
+        }
+
+        if (messagesContainer.value) {
+            messagesContainer.value.addEventListener('scroll', handleScroll)
+            scrollToBottom()
+        }
+    } catch (error) {
+        fb.showToast({
+            type: 'error',
+            title: 'Ошибка инициализации',
+            message: 'Не удалось инициализировать чат',
+        })
+    }
 })
 
 onUnmounted(() => {
-    cleanup()
+    if (mediaQueryList) {
+        mediaQueryList.removeEventListener('change', updateIsMobile)
+    }
+
+    if (messagesContainer.value) {
+        messagesContainer.value.removeEventListener('scroll', handleScroll)
+    }
 })
+
+watch(
+    () => chatStore.messages.length,
+    (newLength: number, oldLength: number) => {
+        if (newLength > oldLength) {
+            checkAndAutoScroll()
+        }
+    },
+)
+
+watch(
+    () => chatStore.currentChat,
+    () => {
+        nextTick(() => scrollToBottom())
+    },
+)
 </script>
